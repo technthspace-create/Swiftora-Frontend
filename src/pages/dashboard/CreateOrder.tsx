@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,24 +12,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Package,
   User,
   MapPin,
   Phone,
   Mail,
-  DollarSign,
   Scale,
   Truck,
   Save,
@@ -46,30 +40,1933 @@ import {
   Info,
   Box,
   ShoppingBag,
+  Zap,
+  Shield,
+  CheckCircle2,
+  ArrowRight,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronLeft,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
+// Types
+interface Box {
+  id: string;
+  weight: string;
+  length: string;
+  breadth: string;
+  height: string;
+  productReference: string;
+}
+
+interface B2CFormData {
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  shippingAddress: string;
+  shippingCity: string;
+  shippingState: string;
+  shippingPincode: string;
+  productName: string;
+  boxes: Box[];
+  totalWeight: string;
+  declaredValue: string;
+  paymentMode: "prepaid" | "cod";
+  codAmount: string;
+  giftWrap: boolean;
+}
+
+interface B2BFormData {
+  companyName: string;
+  gstNumber: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  pickupName: string;
+  pickupAddress: string;
+  pickupCity: string;
+  pickupState: string;
+  pickupPincode: string;
+  pickupPhone: string;
+  pickupEmail: string;
+  shippingAddress: string;
+  shippingCity: string;
+  shippingState: string;
+  shippingPincode: string;
+  orderId: string;
+  productName: string;
+  quantity: string;
+  numberOfBoxes: string;
+  weight: string;
+  boxLength: string;
+  boxHeight: string;
+  boxBreadth: string;
+  totalWeight: string;
+  declaredValue: string;
+  paymentMode: "prepaid" | "cod";
+  codAmount: string;
+  invoiceNumber: string;
+  ewayBillNumber: string;
+  slotDate: string;
+  slotTime: string;
+  warehouseLocation: string;
+  appointmentStatus: "requested" | "confirmed" | "rejected" | "";
+  invoiceFile: File | null;
+  ewayBillFile: File | null;
+  podFile: File | null;
+}
+
+// B2C Fast Form Component - Minimal, lightweight
+const B2CFastForm = ({
+  formData,
+  setFormData,
+  onSubmit,
+  onSaveDraft,
+  orderConfirmed,
+  onConfirm,
+}: {
+  formData: B2CFormData;
+  setFormData: (data: B2CFormData) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onSaveDraft: () => void;
+  orderConfirmed: boolean;
+  onConfirm: () => void;
+}) => {
+  const [isBoxDetailsOpen, setIsBoxDetailsOpen] = useState(false);
+
+  // Calculate total weight from all boxes
+  useEffect(() => {
+    let totalWeight = 0;
+    formData.boxes.forEach((box) => {
+      const weight = parseFloat(box.weight || "0");
+      const length = parseFloat(box.length || "0");
+      const breadth = parseFloat(box.breadth || "0");
+      const height = parseFloat(box.height || "0");
+      
+      // Calculate volumetric weight if dimensions are provided
+      const volumetricWeight = length && breadth && height ? (length * breadth * height) / 5000 : 0;
+      // Use the higher of actual weight or volumetric weight
+      const boxWeight = Math.max(weight, volumetricWeight);
+      totalWeight += boxWeight;
+    });
+
+    const totalWeightStr = totalWeight > 0 ? totalWeight.toFixed(2) : "";
+    if (totalWeightStr !== formData.totalWeight) {
+      setFormData({ ...formData, totalWeight: totalWeightStr });
+    }
+  }, [formData.boxes]);
+
+  const addBox = () => {
+    const newBox: Box = {
+      id: `box-${Date.now()}`,
+      weight: "",
+      length: "",
+      breadth: "",
+      height: "",
+      productReference: "",
+    };
+    setFormData({
+      ...formData,
+      boxes: [...formData.boxes, newBox],
+    });
+    setIsBoxDetailsOpen(true);
+  };
+
+  const removeBox = (boxId: string) => {
+    setFormData({
+      ...formData,
+      boxes: formData.boxes.filter((box) => box.id !== boxId),
+    });
+  };
+
+  const updateBox = (boxId: string, field: keyof Box, value: string) => {
+    setFormData({
+      ...formData,
+      boxes: formData.boxes.map((box) =>
+        box.id === boxId ? { ...box, [field]: value } : box
+      ),
+    });
+  };
+
+  // Calculate chargeable weight (considering volumetric weight)
+  const calculateChargeableWeight = () => {
+    if (formData.boxes.length === 0) return 0;
+    
+    let totalChargeable = 0;
+    formData.boxes.forEach((box) => {
+      const weight = parseFloat(box.weight || "0");
+      const length = parseFloat(box.length || "0");
+      const breadth = parseFloat(box.breadth || "0");
+      const height = parseFloat(box.height || "0");
+      
+      // Calculate volumetric weight
+      const volumetricWeight = length && breadth && height ? (length * breadth * height) / 5000 : 0;
+      // Chargeable weight is the higher of actual or volumetric
+      totalChargeable += Math.max(weight, volumetricWeight);
+    });
+    
+    return totalChargeable > 0 ? totalChargeable.toFixed(2) : (parseFloat(formData.totalWeight || "0")).toFixed(2);
+  };
+
+  const chargeableWeight = calculateChargeableWeight();
+  const chargeableWeightNum = parseFloat(chargeableWeight || "0");
+
+  const calculateShipping = () => {
+    const weight = chargeableWeightNum > 0 ? chargeableWeightNum : parseFloat(formData.totalWeight || "0");
+    const cod = formData.paymentMode === "cod" ? parseFloat(formData.codAmount || "0") * 0.02 : 0;
+    const shipping = weight * 50;
+    return { shipping, cod, total: shipping + cod + (formData.giftWrap ? 50 : 0) };
+  };
+
+  const costs = calculateShipping();
+
+  // Check missing mandatory fields for B2C
+  const getMissingFields = () => {
+    const missing: string[] = [];
+    if (!formData.customerName) missing.push("Customer Name");
+    if (!formData.customerPhone) missing.push("Phone Number");
+    if (!formData.shippingAddress) missing.push("Delivery Address");
+    if (!formData.shippingCity) missing.push("City");
+    if (!formData.shippingPincode) missing.push("Pincode");
+    if (!formData.productName) missing.push("Product Name");
+    if (formData.boxes.length === 0 || formData.boxes.some(b => !b.weight)) missing.push("Box Weight");
+    if (!formData.declaredValue) missing.push("Declared Value");
+    if (formData.paymentMode === "cod" && !formData.codAmount) missing.push("COD Amount");
+    return missing;
+  };
+
+  const missingFields = getMissingFields();
+  const isFormValid = missingFields.length === 0;
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-4">
+      {/* Progress Steps - B2C is simple, just 2 steps */}
+      {!orderConfirmed && (
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+              1
+        </div>
+            <span className="text-sm font-medium text-gray-700">Shipment Details</span>
+      </div>
+          <ArrowRight className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold">
+              2
+        </div>
+            <span className="text-sm font-medium text-gray-500">Review & Confirm</span>
+      </div>
+                  </div>
+      )}
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Main Form - Single Column, Streamlined */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Single Card with All Fields - Fast Flow */}
+            <Card className="border border-blue-200 shadow-sm rounded-lg overflow-hidden">
+              <CardHeader className="bg-blue-50/50 border-b border-blue-100">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Zap className="w-4 h-4 text-blue-600" />
+                  Quick Shipment Details
+                </CardTitle>
+                <CardDescription className="text-blue-700 text-xs">
+                  Fill in the essentials - we'll handle the rest
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {/* Customer Info - Compact Grid */}
+                  <div>
+                  <h3 className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <User className="w-3.5 h-3.5 text-blue-600" />
+                    Recipient Information
+                  </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                      <Label className="text-xs font-medium text-slate-700">Name *</Label>
+                    <Input
+                      required
+                        value={formData.customerName}
+                        onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                      placeholder="Recipient name"
+                        className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                      <Label className="text-xs font-medium text-slate-700">Phone *</Label>
+                    <Input
+                      required
+                      type="tel"
+                        value={formData.customerPhone}
+                        onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                      placeholder="+91 98765 43210"
+                        className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+                </div>
+
+                <div className="border-t border-gray-100 pt-3">
+                  <h3 className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                      Delivery Address
+                  </h3>
+                  <div className="space-y-3">
+                <div>
+                      <Label className="text-xs font-medium text-slate-700">Address *</Label>
+                  <Textarea
+                    required
+                        value={formData.shippingAddress}
+                        onChange={(e) => setFormData({ ...formData, shippingAddress: e.target.value })}
+                        placeholder="Street address"
+                        rows={2}
+                        className="mt-1 text-sm border-blue-200 focus:border-blue-500"
+                  />
+                </div>
+                    <div className="grid grid-cols-2 gap-3">
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">City *</Label>
+                    <Input
+                      required
+                          value={formData.shippingCity}
+                          onChange={(e) => setFormData({ ...formData, shippingCity: e.target.value })}
+                      placeholder="City"
+                          className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">Pincode *</Label>
+                    <Input
+                      required
+                          value={formData.shippingPincode}
+                          onChange={(e) => setFormData({ ...formData, shippingPincode: e.target.value })}
+                      placeholder="400001"
+                      maxLength={6}
+                          className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+                      </div>
+                </div>
+
+                <div className="border-t border-gray-100 pt-3">
+                  <h3 className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <Package className="w-3.5 h-3.5 text-blue-600" />
+                      Product & Payment
+                  </h3>
+                  <div className="space-y-3">
+                  <div>
+                      <Label className="text-xs font-medium text-slate-700">Product *</Label>
+                    <Input
+                        required
+                        value={formData.productName}
+                        onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                        placeholder="Product description"
+                        className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* Box Details Section - Collapsible */}
+                  <Collapsible open={isBoxDetailsOpen} onOpenChange={setIsBoxDetailsOpen}>
+                    <div className="border border-blue-200 rounded-lg bg-blue-50/50">
+                      <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center justify-between p-4 hover:bg-blue-100/50 transition-colors rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Box className="w-5 h-5 text-blue-600" />
+                            <div className="text-left">
+                              <div className="text-sm font-semibold text-gray-800">
+                                Box Details {formData.boxes.length > 0 && `(${formData.boxes.length} ${formData.boxes.length === 1 ? 'box' : 'boxes'})`}
+                              </div>
+                              <div className="text-xs text-gray-600 mt-0.5">
+                                {formData.totalWeight ? `Total Weight: ${formData.totalWeight} kg` : "Add box details for accurate shipping"}
+                              </div>
+                            </div>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isBoxDetailsOpen ? 'rotate-180' : ''}`} />
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-4 pb-4 space-y-4">
+                          {formData.boxes.length === 0 && (
+                            <div className="text-center py-6 text-sm text-gray-500">
+                              No boxes added yet. Click "Add Box" to get started.
+                            </div>
+                          )}
+                          
+                          {formData.boxes.map((box, index) => (
+                            <div
+                              key={box.id}
+                              className="bg-white border border-blue-200 rounded-lg p-4 space-y-3 shadow-sm"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Box className="w-4 h-4 text-blue-600" />
+                                  <span className="text-sm font-semibold text-gray-700">
+                                    Box {index + 1}
+                                  </span>
+                                  {box.weight && (
+                                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                      {box.weight} kg
+                                    </Badge>
+                                  )}
+                                </div>
+                                {formData.boxes.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeBox(box.id)}
+                                    className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                              
+                  <div>
+                                  <Label className="text-xs font-medium text-gray-600">Weight (kg) *</Label>
+                    <Input
+                          required
+                          type="number"
+                          step="0.1"
+                                    value={box.weight}
+                                    onChange={(e) => updateBox(box.id, "weight", e.target.value)}
+                          placeholder="0.5"
+                                    className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                        />
+                      </div>
+                              
+                              {/* Advanced: Dimensions - Collapsed by default */}
+                              <Collapsible>
+                                <CollapsibleTrigger className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                                  <ChevronDown className="w-3 h-3" />
+                                  Add dimensions (for accurate weight calculation)
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="mt-2 grid grid-cols-3 gap-2">
+                        <Input
+                          type="number"
+                                      step="0.1"
+                                      value={box.length}
+                                      onChange={(e) => updateBox(box.id, "length", e.target.value)}
+                                      placeholder="L (cm)"
+                                      className="h-9 text-sm border-blue-200 focus:border-blue-500"
+                                    />
+                                    <Input
+                                      type="number"
+                                      step="0.1"
+                                      value={box.breadth}
+                                      onChange={(e) => updateBox(box.id, "breadth", e.target.value)}
+                                      placeholder="B (cm)"
+                                      className="h-9 text-sm border-blue-200 focus:border-blue-500"
+                                    />
+                                    <Input
+                                      type="number"
+                                      step="0.1"
+                                      value={box.height}
+                                      onChange={(e) => updateBox(box.id, "height", e.target.value)}
+                                      placeholder="H (cm)"
+                                      className="h-9 text-sm border-blue-200 focus:border-blue-500"
+                    />
+                  </div>
+                                </CollapsibleContent>
+                              </Collapsible>
+                </div>
+                          ))}
+                          
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={addBox}
+                            className="w-full border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400"
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Box
+                          </Button>
+                          
+                          {formData.totalWeight && (
+                            <div className="bg-blue-100 border border-blue-300 rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-blue-900">Total Weight (Auto-calculated)</span>
+                                <span className="text-sm font-bold text-blue-700">{formData.totalWeight} kg</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+
+                    <div>
+                      <Label className="text-xs font-medium text-slate-700">Payment *</Label>
+                      <RadioGroup
+                        value={formData.paymentMode}
+                        onValueChange={(value) => setFormData({ ...formData, paymentMode: value as "prepaid" | "cod" })}
+                        className="flex gap-4 mt-2"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="prepaid" id="prepaid" />
+                          <Label htmlFor="prepaid" className="cursor-pointer text-sm">Prepaid</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="cod" id="cod" />
+                          <Label htmlFor="cod" className="cursor-pointer text-sm">COD</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    {formData.paymentMode === "cod" && (
+                      <div>
+                        <Label className="text-xs font-medium text-slate-700">COD Amount (₹) *</Label>
+                        <Input
+                          required
+                          type="number"
+                          value={formData.codAmount}
+                          onChange={(e) => setFormData({ ...formData, codAmount: e.target.value })}
+                          placeholder="Amount"
+                          className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Add-ons - Collapsible */}
+                    <Collapsible>
+                      <CollapsibleTrigger className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 pt-1">
+                        <ChevronDown className="w-3 h-3" />
+                        Add-ons (optional)
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="pt-2 space-y-2">
+                          <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="giftWrap"
+                              checked={formData.giftWrap}
+                              onCheckedChange={(checked) => setFormData({ ...formData, giftWrap: !!checked })}
+                            />
+                            <Label htmlFor="giftWrap" className="cursor-pointer text-xs">
+                              Gift wrap (+₹50)
+                      </Label>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+              </div>
+
+          {/* Sidebar - Summary & Actions */}
+              <div className="lg:col-span-1">
+            <Card className="sticky top-4 border border-blue-200 shadow-sm rounded-lg">
+              <CardHeader className="bg-blue-50/50 border-b border-blue-100 rounded-t-lg">
+                <CardTitle className="text-slate-900 font-medium text-sm flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-blue-600" />
+                  Order Summary
+                </CardTitle>
+                  </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <Badge className="bg-blue-50 text-blue-700 border border-blue-200 w-full justify-center py-1.5 text-xs">
+                  <Zap className="w-3.5 h-3.5 mr-2" />
+                  Fast B2C Shipment
+                </Badge>
+
+                {/* Completion Status */}
+                {missingFields.length > 0 && (
+                  <div className="text-xs text-slate-600 pt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span>Completion</span>
+                      <span className="font-medium text-amber-600">
+                        {Math.max(0, Math.round(((10 - missingFields.length) / 10) * 100))}%
+                      </span>
+                  </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5">
+                      <div
+                        className="bg-amber-500 h-1.5 rounded-full transition-all"
+                        style={{ width: `${Math.max(0, ((10 - missingFields.length) / 10) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Shipment Details */}
+                <div className="space-y-2 pt-2 border-t border-blue-100">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-600">Boxes</span>
+                    <span className="font-medium text-slate-900">{formData.boxes.length} {formData.boxes.length === 1 ? 'box' : 'boxes'}</span>
+                  </div>
+                  {formData.totalWeight && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-600">Total Weight</span>
+                      <span className="font-medium text-slate-900">{formData.totalWeight} kg</span>
+                    </div>
+                  )}
+                  {chargeableWeight && parseFloat(chargeableWeight) > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-600">Chargeable Weight</span>
+                      <span className="font-semibold text-blue-600">{chargeableWeight} kg</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Missing Fields Warning */}
+                {missingFields.length > 0 && (
+                  <Alert className="bg-amber-50/50 border-amber-200">
+                    <Info className="h-3.5 w-3.5 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800">
+                      <div className="font-medium mb-1">Complete these fields:</div>
+                      <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                        {missingFields.slice(0, 3).map((field, idx) => (
+                          <li key={idx}>{field}</li>
+                        ))}
+                        {missingFields.length > 3 && (
+                          <li className="text-amber-700">+{missingFields.length - 3} more</li>
+                        )}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Cost Breakdown */}
+                <div className="space-y-2 pt-2 border-t border-blue-100">
+                    <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Shipping</span>
+                    <span className="font-semibold text-blue-600">₹{costs.shipping.toFixed(2)}</span>
+                    </div>
+                  {formData.paymentMode === "cod" && (
+                      <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">COD Charges</span>
+                      <span className="font-semibold text-blue-600">₹{costs.cod.toFixed(2)}</span>
+                      </div>
+                    )}
+                  {formData.giftWrap && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Gift Wrap</span>
+                      <span className="font-semibold text-blue-600">₹50.00</span>
+                      </div>
+                  )}
+                  <div className="border-t border-blue-100 pt-2">
+                    <div className="flex justify-between font-semibold text-base">
+                      <span>Total</span>
+                      <span className="text-blue-600">₹{costs.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                    {!orderConfirmed ? (
+                  <div className="space-y-2 pt-3 border-t border-blue-100">
+                        <Button
+                          type="submit"
+                          disabled={!isFormValid}
+                      className={`w-full font-medium py-2.5 text-sm ${
+                        isFormValid
+                          ? "bg-blue-600 hover:bg-blue-700 text-white"
+                          : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                      }`}
+                        >
+                      <Zap className="w-4 h-4 mr-2" />
+                          {isFormValid ? "Create Shipment" : "Complete Required Fields"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                      className="w-full border-blue-200 hover:bg-blue-50 text-sm"
+                      onClick={onSaveDraft}
+                        >
+                          Save as Draft
+                        </Button>
+                      </div>
+                    ) : (
+                  <div className="space-y-2 pt-3 border-t border-blue-100">
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-2 text-green-800">
+                        <CheckCircle2 className="w-5 h-5" />
+                        <p className="font-semibold">Shipment Created!</p>
+                      </div>
+                        </div>
+                        <Button
+                          type="button"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                      onClick={onConfirm}
+                        >
+                      Continue to Orders
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// B2B Structured Form Component - Compliance-driven, appointment-based
+const B2BStructuredForm = ({
+  formData,
+  setFormData,
+  onSubmit,
+  onSaveDraft,
+  orderConfirmed,
+  onConfirm,
+  onFileUpload,
+  onRemoveFile,
+  invoiceFileName,
+  ewayBillFileName,
+  onGenerateDocument,
+  generatedDocuments,
+  onExportCSV,
+  onGenerateInvoice,
+}: {
+  formData: B2BFormData;
+  setFormData: (data: B2BFormData) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onSaveDraft: () => void;
+  orderConfirmed: boolean;
+  onConfirm: () => void;
+  onFileUpload: (e: React.ChangeEvent<HTMLInputElement>, type: "invoice" | "ewayBill" | "pod") => void;
+  onRemoveFile: (type: "invoice" | "ewayBill" | "pod") => void;
+  invoiceFileName: string;
+  ewayBillFileName: string;
+  onGenerateDocument: (type: "manifest" | "gst" | "awb" | "label") => void;
+  generatedDocuments: { manifest: boolean; gst: boolean; awb: boolean; label: boolean };
+  onExportCSV: () => void;
+  onGenerateInvoice: () => void;
+}) => {
+  // Calculate total weight
+  useEffect(() => {
+    const L = parseFloat(formData.boxLength || "0");
+    const H = parseFloat(formData.boxHeight || "0");
+    const B = parseFloat(formData.boxBreadth || "0");
+    const numBoxes = parseInt(formData.numberOfBoxes || "0") || 0;
+    const perBoxWeightInput = parseFloat(formData.weight || "0") || 0;
+
+    const volumetricPerBox = L && H && B ? (L * H * B) / 5000 : 0;
+    const perBoxComputed = Math.max(perBoxWeightInput, volumetricPerBox);
+    const total = numBoxes > 0 ? perBoxComputed * numBoxes : perBoxComputed;
+    const totalRounded = isFinite(total) && total > 0 ? total.toFixed(2) : "";
+
+    if (totalRounded !== formData.totalWeight) {
+      setFormData({ ...formData, totalWeight: totalRounded });
+    }
+  }, [formData.boxLength, formData.boxHeight, formData.boxBreadth, formData.weight, formData.numberOfBoxes]);
+
+  // Calculate chargeable weight for B2B
+  const calculateChargeableWeight = () => {
+    const L = parseFloat(formData.boxLength || "0");
+    const H = parseFloat(formData.boxHeight || "0");
+    const B = parseFloat(formData.boxBreadth || "0");
+    const numBoxes = parseInt(formData.numberOfBoxes || "0") || 0;
+    const perBoxWeightInput = parseFloat(formData.weight || "0") || 0;
+
+    const volumetricPerBox = L && H && B ? (L * H * B) / 5000 : 0;
+    const perBoxComputed = Math.max(perBoxWeightInput, volumetricPerBox);
+    const total = numBoxes > 0 ? perBoxComputed * numBoxes : perBoxComputed;
+    
+    return total > 0 ? total.toFixed(2) : (parseFloat(formData.totalWeight || "0")).toFixed(2);
+  };
+
+  const chargeableWeight = calculateChargeableWeight();
+  const chargeableWeightNum = parseFloat(chargeableWeight || "0");
+
+  const calculateShipping = () => {
+    const weight = chargeableWeightNum > 0 ? chargeableWeightNum : parseFloat(formData.totalWeight || formData.weight || "0");
+    const cod = formData.paymentMode === "cod" ? parseFloat(formData.codAmount || "0") * 0.02 : 0;
+    const shipping = weight * 50;
+    return { shipping, cod, total: shipping + cod };
+  };
+
+  const costs = calculateShipping();
+
+  // Check missing mandatory fields for B2B
+  const getMissingFields = () => {
+    const missing: string[] = [];
+    if (!formData.companyName) missing.push("Company Name");
+    if (!formData.gstNumber) missing.push("GST Number");
+    if (!formData.customerName) missing.push("Contact Name");
+    if (!formData.customerPhone) missing.push("Phone");
+    if (!formData.pickupAddress) missing.push("Pickup Address");
+    if (!formData.pickupCity || !formData.pickupPincode) missing.push("Pickup Location");
+    if (!formData.shippingAddress) missing.push("Delivery Address");
+    if (!formData.shippingCity || !formData.shippingPincode) missing.push("Delivery Location");
+    if (!formData.slotDate || !formData.slotTime || !formData.warehouseLocation) missing.push("Appointment Booking");
+    if (formData.appointmentStatus === "" || formData.appointmentStatus === "rejected") missing.push("Appointment Confirmation");
+    if (!formData.invoiceNumber) missing.push("Invoice Number");
+    if (!formData.invoiceFile) missing.push("Invoice Upload");
+    if (!formData.productName) missing.push("Product Name");
+    if (!formData.weight || !formData.numberOfBoxes) missing.push("Shipment Weight/Boxes");
+    if (!formData.declaredValue) missing.push("Declared Value");
+    if (formData.paymentMode === "cod" && !formData.codAmount) missing.push("COD Amount");
+    return missing;
+  };
+
+  const missingFields = getMissingFields();
+  const isFormValid = missingFields.length === 0;
+
+  const timeSlots = [
+    "09:00 AM - 12:00 PM",
+    "12:00 PM - 03:00 PM",
+    "03:00 PM - 06:00 PM",
+    "06:00 PM - 09:00 PM",
+  ];
+
+  // Step management for guided flow
+  const [activeStep, setActiveStep] = useState<string>("step-1");
+  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+
+  // Check if a step is completed
+  const isStepCompleted = (step: string): boolean => {
+    switch (step) {
+      case "step-1":
+        return !!(formData.companyName && formData.gstNumber && formData.customerName && formData.customerPhone);
+      case "step-2":
+        return !!(formData.pickupAddress && formData.pickupCity && formData.pickupPincode && 
+                  formData.shippingAddress && formData.shippingCity && formData.shippingPincode);
+      case "step-3":
+        return !!(formData.slotDate && formData.slotTime && formData.warehouseLocation && 
+                  (formData.appointmentStatus === "confirmed" || formData.appointmentStatus === "requested"));
+      case "step-4":
+        return !!(formData.invoiceNumber && formData.invoiceFile);
+      case "step-5":
+        return !!(formData.productName && formData.weight && formData.declaredValue && 
+                  formData.numberOfBoxes && formData.quantity);
+      default:
+        return false;
+    }
+  };
+
+  // Update completed steps
+  useEffect(() => {
+    const steps = ["step-1", "step-2", "step-3", "step-4", "step-5"];
+    const newCompleted = new Set<string>();
+    steps.forEach((step) => {
+      if (isStepCompleted(step)) {
+        newCompleted.add(step);
+      }
+    });
+    setCompletedSteps(newCompleted);
+  }, [formData]);
+
+  // Navigate to next step
+  const goToNextStep = () => {
+    const steps = ["step-1", "step-2", "step-3", "step-4", "step-5", "step-6"];
+    const currentIndex = steps.indexOf(activeStep);
+    if (currentIndex < steps.length - 1) {
+      setActiveStep(steps[currentIndex + 1]);
+    }
+  };
+
+  // Navigate to previous step
+  const goToPreviousStep = () => {
+    const steps = ["step-1", "step-2", "step-3", "step-4", "step-5", "step-6"];
+    const currentIndex = steps.indexOf(activeStep);
+    if (currentIndex > 0) {
+      setActiveStep(steps[currentIndex - 1]);
+    }
+  };
+
+  // Handle step change
+  const handleStepChange = (value: string) => {
+    if (value) setActiveStep(value);
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-4">
+      {/* Progress Steps Indicator */}
+      {!orderConfirmed && (
+        <div className="flex items-center justify-center gap-2 mb-6 flex-wrap">
+          {[
+            { id: "step-1", label: "Company & GST", icon: Building2 },
+            { id: "step-2", label: "Warehouses", icon: Truck },
+            { id: "step-3", label: "Appointment", icon: Calendar },
+            { id: "step-4", label: "Compliance", icon: Shield },
+            { id: "step-5", label: "Dimensions", icon: Scale },
+            { id: "step-6", label: "Review", icon: CheckCircle2 },
+          ].map((step, index, array) => (
+            <React.Fragment key={step.id}>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center font-medium text-xs transition-all ${
+                    activeStep === step.id
+                      ? "bg-slate-700 text-white scale-105"
+                      : completedSteps.has(step.id)
+                      ? "bg-green-100 text-green-700 border border-green-200"
+                      : "bg-gray-100 text-gray-600 border border-gray-200"
+                  }`}
+                >
+                  {completedSteps.has(step.id) ? (
+                    <Check className="w-5 h-5" />
+                  ) : (
+                    index + 1
+                  )}
+                </div>
+                <span className={`text-xs font-medium ${
+                  activeStep === step.id
+                    ? "text-slate-900 font-bold"
+                    : completedSteps.has(step.id)
+                    ? "text-green-700"
+                    : "text-gray-500"
+                }`}>
+                  {step.label}
+                </span>
+              </div>
+              {index < array.length - 1 && (
+                <ArrowRight className="w-4 h-4 text-gray-400" />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Main Form - Step-based Accordion */}
+          <div className="lg:col-span-3">
+            <Accordion
+              type="single"
+              value={activeStep}
+              onValueChange={handleStepChange}
+              collapsible={false}
+              className="space-y-2"
+            >
+              {/* Step 1: Company & GST Details */}
+              <AccordionItem value="step-1" className="border-b border-slate-200 bg-white">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50/50">
+                  <div className="flex items-center gap-3 w-full">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-xs ${
+                      completedSteps.has("step-1") ? "bg-green-100 text-green-700 border border-green-200" : "bg-slate-100 text-slate-700 border border-slate-200"
+                    }`}>
+                      {completedSteps.has("step-1") ? <Check className="w-4 h-4" /> : "1"}
+                      </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-medium text-slate-900 text-sm">Company & GST Details</div>
+                      <div className="text-xs text-slate-500">Business information and tax compliance</div>
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="px-4 pb-4 pt-2">
+                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <Label className="text-slate-900 font-semibold text-sm">Company Name *</Label>
+                        <Input
+                    required
+                      value={formData.companyName}
+                      onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                          placeholder="Company Pvt. Ltd."
+                      className="mt-1 border-slate-300 focus:border-slate-700 bg-white"
+                  />
+                </div>
+                  <div>
+                    <Label className="text-slate-900 font-semibold text-sm">GST Number *</Label>
+                    <Input
+                      required
+                      value={formData.gstNumber}
+                      onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                          placeholder="27AAAAA0000A1Z5"
+                      className="mt-1 border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-slate-900 font-semibold text-sm">Contact Name *</Label>
+                    <Input
+                      required
+                      value={formData.customerName}
+                      onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                      placeholder="Contact person"
+                      className="mt-1 border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-900 font-semibold text-sm">Phone *</Label>
+                    <Input
+                      required
+                          type="tel"
+                      value={formData.customerPhone}
+                      onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                          placeholder="+91 98765 43210"
+                      className="mt-1 border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                </div>
+                    <div>
+                    <Label className="text-slate-900 font-semibold text-sm">Email</Label>
+                      <Input
+                        type="email"
+                      value={formData.customerEmail}
+                      onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+                        placeholder="contact@company.com"
+                      className="mt-1 border-slate-300 focus:border-slate-700 bg-white"
+                      />
+                </div>
+                    </div>
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                      <Button type="button" onClick={goToNextStep} variant="outline" className="border-slate-300 hover:bg-slate-50">
+                        Next: Warehouses <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Step 2: Pickup & Drop Warehouses */}
+            <AccordionItem value="step-2" className="border-b border-slate-200 bg-white">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50/50">
+                <div className="flex items-center gap-3 w-full">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-xs ${
+                    completedSteps.has("step-2") ? "bg-green-100 text-green-700 border border-green-200" : "bg-slate-100 text-slate-700 border border-slate-200"
+                  }`}>
+                    {completedSteps.has("step-2") ? <Check className="w-4 h-4" /> : "2"}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-slate-900 text-sm">Pickup & Drop Warehouses</div>
+                    <div className="text-xs text-slate-500">Warehouse origin and destination details</div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="px-4 pb-4 pt-2">
+                  <div className="space-y-5">
+                {/* Pickup Address */}
+                <div>
+                  <h4 className="text-xs font-medium text-slate-700 mb-3 flex items-center gap-2">
+                    <Truck className="w-3.5 h-3.5" />
+                        Pickup Address *
+                      </h4>
+                  <div className="space-y-3 pl-3 border-l border-slate-200">
+                        <div>
+                      <Label className="text-xs font-medium text-slate-700">Address *</Label>
+                          <Textarea
+                            required
+                        value={formData.pickupAddress}
+                        onChange={(e) => setFormData({ ...formData, pickupAddress: e.target.value })}
+                            placeholder="Warehouse address"
+                            rows={2}
+                        className="mt-1 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                        <div className="grid grid-cols-2 gap-3">
+                <div>
+                        <Label className="text-xs font-medium text-slate-700">City *</Label>
+                  <Input
+                    required
+                          value={formData.pickupCity}
+                          onChange={(e) => setFormData({ ...formData, pickupCity: e.target.value })}
+                              placeholder="City"
+                          className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                  />
+                </div>
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">Pincode *</Label>
+                    <Input
+                      required
+                          value={formData.pickupPincode}
+                          onChange={(e) => setFormData({ ...formData, pickupPincode: e.target.value })}
+                              placeholder="400001"
+                              maxLength={6}
+                          className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                </div>
+                    </div>
+                    </div>
+
+                {/* Delivery Address */}
+                  <div>
+                  <h4 className="text-xs font-medium text-slate-700 mb-3 flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5" />
+                        Delivery Address *
+                      </h4>
+                  <div className="space-y-3 pl-3 border-l border-slate-200">
+                        <div>
+                      <Label className="text-xs font-medium text-slate-700">Address *</Label>
+                          <Textarea
+                      required
+                        value={formData.shippingAddress}
+                        onChange={(e) => setFormData({ ...formData, shippingAddress: e.target.value })}
+                            placeholder="Delivery address"
+                            rows={2}
+                        className="mt-1 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                        <div className="grid grid-cols-2 gap-3">
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">City *</Label>
+                    <Input
+                              required
+                          value={formData.shippingCity}
+                          onChange={(e) => setFormData({ ...formData, shippingCity: e.target.value })}
+                              placeholder="City"
+                          className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">Pincode *</Label>
+                    <Input
+                              required
+                          value={formData.shippingPincode}
+                          onChange={(e) => setFormData({ ...formData, shippingPincode: e.target.value })}
+                              placeholder="110001"
+                          className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                </div>
+                      </div>
+                </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 flex justify-between">
+                    <Button type="button" variant="outline" onClick={goToPreviousStep} className="border-slate-300 hover:bg-slate-50">
+                      <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+                    </Button>
+                    <Button type="button" onClick={goToNextStep} variant="outline" className="border-slate-300 hover:bg-slate-50">
+                      Next: Appointment <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Step 3: Appointment Booking */}
+            <AccordionItem value="step-3" className="border-b border-slate-200 bg-white">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50/50">
+                <div className="flex items-center gap-3 w-full">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-xs ${
+                    completedSteps.has("step-3") ? "bg-green-100 text-green-700 border border-green-200" : "bg-slate-100 text-slate-700 border border-slate-200"
+                  }`}>
+                    {completedSteps.has("step-3") ? <Check className="w-4 h-4" /> : "3"}
+                    </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-slate-900 text-sm">Appointment Booking *</div>
+                    <div className="text-xs text-slate-500">Schedule pickup appointment with warehouse</div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="px-4 pb-4 pt-2">
+                  <div className="space-y-4">
+
+                {/* Warehouse/Dock Location */}
+                  <div>
+                  <Label className="text-slate-900 font-semibold text-sm">Warehouse / Dock Location *</Label>
+                  <select
+                    required
+                    value={formData.warehouseLocation}
+                    onChange={(e) => setFormData({ ...formData, warehouseLocation: e.target.value })}
+                    className="mt-1 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
+                  >
+                    <option value="">Select warehouse/dock location</option>
+                    <option value="main-warehouse">Main Warehouse - Dock A</option>
+                    <option value="warehouse-2-dock-b">Warehouse 2 - Dock B</option>
+                    <option value="warehouse-2-dock-c">Warehouse 2 - Dock C</option>
+                    <option value="distribution-center">Distribution Center - Dock 1</option>
+                    <option value="distribution-center-dock-2">Distribution Center - Dock 2</option>
+                    <option value="cold-storage">Cold Storage Facility</option>
+                    <option value="other">Other (Specify in notes)</option>
+                  </select>
+                  {formData.warehouseLocation && (
+                    <p className="text-xs text-slate-600 mt-2">
+                      Selected: <span className="font-medium">{formData.warehouseLocation.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Pickup Date and Time Slot */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-900 font-semibold text-sm">Preferred Pickup Date *</Label>
+                    <Input
+                              required
+                      type="date"
+                      value={formData.slotDate}
+                      onChange={(e) => {
+                        setFormData({ 
+                          ...formData, 
+                          slotDate: e.target.value
+                        });
+                      }}
+                      min={new Date().toISOString().split("T")[0]}
+                      className="mt-1 border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Select a date at least 24 hours in advance</p>
+                  </div>
+                  <div>
+                    <Label className="text-slate-900 font-semibold text-sm">Time Slot Window *</Label>
+                    <select
+                      required
+                      value={formData.slotTime}
+                      onChange={(e) => {
+                        setFormData({ 
+                          ...formData, 
+                          slotTime: e.target.value
+                        });
+                      }}
+                      className="mt-1 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
+                    >
+                      <option value="">Select time slot</option>
+                      {timeSlots.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot}
+                        </option>
+                      ))}
+                    </select>
+                </div>
+                      </div>
+
+                {/* Appointment Status Display */}
+                {formData.slotDate && formData.slotTime && formData.appointmentStatus && (
+                  <div className="border-t border-slate-100 pt-3 mt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-600">Status</span>
+                      <Badge
+                        className={
+                          formData.appointmentStatus === "confirmed"
+                            ? "bg-green-100 text-green-700 border border-green-200 text-xs"
+                            : formData.appointmentStatus === "rejected"
+                            ? "bg-red-100 text-red-700 border border-red-200 text-xs"
+                            : "bg-amber-100 text-amber-700 border border-amber-200 text-xs"
+                        }
+                      >
+                        {formData.appointmentStatus === "confirmed"
+                          ? "✓ Confirmed"
+                          : formData.appointmentStatus === "rejected"
+                          ? "✗ Rejected"
+                          : "⏳ Requested"}
+                      </Badge>
+                </div>
+                  </div>
+                )}
+
+                {/* Request Appointment Button */}
+                {formData.slotDate && formData.slotTime && formData.warehouseLocation && formData.appointmentStatus === "" && (
+                  <div className="border-t border-slate-100 pt-3 mt-3">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, appointmentStatus: "requested" });
+                        toast.success("Appointment request submitted!");
+                      }}
+                      className="w-full bg-slate-900 hover:bg-slate-800 text-white text-sm"
+                    >
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Request Appointment
+                    </Button>
+                    </div>
+                )}
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 flex justify-between">
+                    <Button type="button" variant="outline" onClick={goToPreviousStep} className="border-slate-300 hover:bg-slate-50">
+                      <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+                    </Button>
+                    <Button type="button" onClick={goToNextStep} variant="outline" className="border-slate-300 hover:bg-slate-50">
+                      Next: Compliance <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Step 4: Invoice & E-way Bill Upload */}
+            <AccordionItem value="step-4" className="border-b border-slate-200 bg-white">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50/50">
+                <div className="flex items-center gap-3 w-full">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-xs ${
+                    completedSteps.has("step-4") ? "bg-green-100 text-green-700 border border-green-200" : "bg-slate-100 text-slate-700 border border-slate-200"
+                  }`}>
+                    {completedSteps.has("step-4") ? <Check className="w-4 h-4" /> : "4"}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-slate-900 text-sm">Invoice & E-way Bill Upload</div>
+                    <div className="text-xs text-slate-500">Invoice, E-way Bill, and required documentation</div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="px-4 pb-4 pt-2">
+                  <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-900 font-semibold text-sm">Invoice Number *</Label>
+                        <Input
+                        required
+                      value={formData.invoiceNumber}
+                      onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+                        placeholder="INV-2025-001"
+                      className="mt-1 border-slate-300 focus:border-slate-700 bg-white"
+                        />
+                      </div>
+                      <div>
+                    <Label className="text-slate-900 font-semibold text-sm">E-way Bill Number</Label>
+                        <Input
+                      value={formData.ewayBillNumber}
+                      onChange={(e) => setFormData({ ...formData, ewayBillNumber: e.target.value })}
+                        placeholder="EWB-XXXXXXXXXX"
+                      className="mt-1 border-slate-300 focus:border-slate-700 bg-white"
+                        />
+                  </div>
+                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                    <Label className="text-slate-900 font-semibold text-sm">Invoice Upload *</Label>
+                    {!formData.invoiceFile ? (
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-400 rounded cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all mt-1">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <Upload className="w-8 h-8 mb-2 text-slate-600" />
+                                <p className="mb-2 text-sm text-slate-600">
+                                  <span className="font-semibold">Click to upload</span> invoice
+                                </p>
+                                <p className="text-xs text-slate-500">PNG, JPG, PDF (MAX. 5MB)</p>
+                              </div>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/jpeg,image/png,image/jpg,application/pdf"
+                          onChange={(e) => onFileUpload(e, "invoice")}
+                              />
+                            </label>
+                        ) : (
+                      <div className="mt-1 p-4 border border-slate-300 rounded bg-slate-50 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-slate-600" />
+                              <div>
+                                <p className="text-sm font-medium text-slate-900">{invoiceFileName}</p>
+                                <p className="text-xs text-slate-600">
+                              {(formData.invoiceFile!.size / 1024).toFixed(2)} KB
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="hover:bg-slate-200"
+                          onClick={() => onRemoveFile("invoice")}
+                            >
+                              <X className="w-4 h-4 text-slate-600" />
+                            </Button>
+                    </div>
+                        )}
+                  </div>
+                          </div>
+                      </div>
+                  <div className="pt-3 border-t border-slate-100 flex justify-between">
+                    <Button type="button" variant="outline" onClick={goToPreviousStep} className="border-slate-300 hover:bg-slate-50">
+                      <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+                    </Button>
+                    <Button type="button" onClick={goToNextStep} variant="outline" className="border-slate-300 hover:bg-slate-50">
+                      Next: Dimensions <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </div>
+                      </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Step 5: Shipment Dimensions & Boxes */}
+            <AccordionItem value="step-5" className="border-b border-slate-200 bg-white">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50/50">
+                <div className="flex items-center gap-3 w-full">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-xs ${
+                    completedSteps.has("step-5") ? "bg-green-100 text-green-700 border border-green-200" : "bg-slate-100 text-slate-700 border border-slate-200"
+                  }`}>
+                    {completedSteps.has("step-5") ? <Check className="w-4 h-4" /> : "5"}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-slate-900 text-sm">Shipment Dimensions & Boxes</div>
+                    <div className="text-xs text-slate-500">Shipment dimensions and product information</div>
+                </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="px-4 pb-4 pt-2">
+                  <div className="space-y-4">
+                <div>
+                    <Label className="text-xs font-medium text-slate-700">Product *</Label>
+                      <Input
+                        required
+                      value={formData.productName}
+                      onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                        placeholder="Product description"
+                      className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                      />
+                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                    <Label className="text-xs font-medium text-slate-700">Boxes *</Label>
+                        <Input
+                          required
+                          type="number"
+                          min="1"
+                      value={formData.numberOfBoxes}
+                      onChange={(e) => setFormData({ ...formData, numberOfBoxes: e.target.value })}
+                      className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                        />
+                  </div>
+                <div>
+                    <Label className="text-xs font-medium text-slate-700">Weight per Box (kg) *</Label>
+                        <Input
+                          required
+                          type="number"
+                          step="0.1"
+                      value={formData.weight}
+                      onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                          placeholder="0.5"
+                      className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                        />
+                        </div>
+                        </div>
+                    
+                    {/* Dimensions - Collapsible */}
+                    <Collapsible>
+                      <CollapsibleTrigger className="text-xs text-slate-600 hover:text-slate-700 flex items-center gap-1">
+                        <ChevronDown className="w-3 h-3" />
+                        Add dimensions (for accurate weight calculation)
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                        <Input
+                          type="number"
+                          step="0.1"
+                            value={formData.boxLength}
+                            onChange={(e) => setFormData({ ...formData, boxLength: e.target.value })}
+                            placeholder="L (cm)"
+                            className="h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                          />
+                        <Input
+                          type="number"
+                          step="0.1"
+                            value={formData.boxBreadth}
+                            onChange={(e) => setFormData({ ...formData, boxBreadth: e.target.value })}
+                            placeholder="B (cm)"
+                            className="h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                          />
+                        <Input
+                          type="number"
+                          step="0.1"
+                            value={formData.boxHeight}
+                            onChange={(e) => setFormData({ ...formData, boxHeight: e.target.value })}
+                            placeholder="H (cm)"
+                            className="h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                        />
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                  <Label className="text-xs font-medium text-slate-700">Total Weight (kg)</Label>
+                      <Input
+                        readOnly
+                    value={formData.totalWeight}
+                        placeholder="Auto-calculated"
+                    className="mt-1 h-9 text-sm bg-slate-100 border-slate-300"
+                      />
+                </div>
+                    <div>
+                    <Label className="text-xs font-medium text-slate-700">Declared Value (₹) *</Label>
+                        <Input
+                          required
+                          type="number"
+                      value={formData.declaredValue}
+                      onChange={(e) => setFormData({ ...formData, declaredValue: e.target.value })}
+                          placeholder="1000"
+                      className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                        />
+                        </div>
+                    </div>
+                    <div>
+                  <Label className="text-xs font-medium text-slate-700">Payment *</Label>
+                      <RadioGroup
+                    value={formData.paymentMode}
+                    onValueChange={(value) => setFormData({ ...formData, paymentMode: value as "prepaid" | "cod" })}
+                        className="flex gap-4 mt-2"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="prepaid" id="b2b-prepaid" />
+                      <Label htmlFor="b2b-prepaid" className="cursor-pointer text-sm">Prepaid</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="cod" id="b2b-cod" />
+                      <Label htmlFor="b2b-cod" className="cursor-pointer text-sm">COD</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                {formData.paymentMode === "cod" && (
+                      <div>
+                    <Label className="text-xs font-medium text-slate-700">COD Amount (₹) *</Label>
+                        <Input
+                          required
+                          type="number"
+                      value={formData.codAmount}
+                      onChange={(e) => setFormData({ ...formData, codAmount: e.target.value })}
+                          placeholder="Amount"
+                      className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 flex justify-between">
+                    <Button type="button" variant="outline" onClick={goToPreviousStep} className="border-slate-300 hover:bg-slate-50">
+                      <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+                    </Button>
+                    <Button type="button" onClick={goToNextStep} variant="outline" className="border-slate-300 hover:bg-slate-50">
+                      Next: Review <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Step 6: Review & Create Consignment */}
+            <AccordionItem value="step-6" className="border-b border-slate-200 bg-white">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50/50">
+                <div className="flex items-center gap-3 w-full">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center font-medium text-xs bg-slate-100 text-slate-700 border border-slate-200">
+                    6
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-medium text-slate-900 text-sm">Review & Create Consignment</div>
+                    <div className="text-xs text-slate-500">Review all details before creating your consignment</div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="px-4 pb-4 pt-2">
+                  <div className="space-y-3">
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-medium text-slate-900 mb-3">Review Your Consignment Details</h3>
+                      
+                      {/* Company Details Review */}
+                      <div className="bg-slate-50/50 border border-slate-200 rounded p-3">
+                        <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                          <Building2 className="w-4 h-4" />
+                          Company & GST Details
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                            <span className="text-slate-600">Company:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.companyName || "Not provided"}</span>
+                    </div>
+                          <div>
+                            <span className="text-slate-600">GST:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.gstNumber || "Not provided"}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600">Contact:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.customerName || "Not provided"}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600">Phone:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.customerPhone || "Not provided"}</span>
+                          </div>
+                        </div>
+          </div>
+
+                      {/* Addresses Review */}
+                      <div className="bg-slate-50/50 border border-slate-200 rounded p-3">
+                        <h4 className="font-medium text-slate-900 mb-2 text-sm flex items-center gap-2">
+                          <Truck className="w-3.5 h-3.5" />
+                          Pickup & Delivery
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-slate-600">Pickup:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.pickupCity || "Not provided"}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600">Delivery:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.shippingCity || "Not provided"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Appointment Review */}
+                      {formData.slotDate && formData.slotTime && (
+                        <div className="bg-slate-50/50 border border-slate-200 rounded p-3">
+                          <h4 className="font-medium text-slate-900 mb-2 text-sm flex items-center gap-2">
+                            <Calendar className="w-3.5 h-3.5" />
+                            Appointment
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-slate-600">Date:</span>
+                              <span className="font-medium text-slate-900 ml-2">{formData.slotDate}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-600">Time:</span>
+                              <span className="font-medium text-slate-900 ml-2">{formData.slotTime}</span>
+                            </div>
+                            {formData.warehouseLocation && (
+                              <div className="col-span-2">
+                                <span className="text-slate-600">Location:</span>
+                                <span className="font-medium text-slate-900 ml-2">
+                                  {formData.warehouseLocation.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Product Review */}
+                      <div className="bg-slate-50/50 border border-slate-200 rounded p-3">
+                        <h4 className="font-medium text-slate-900 mb-2 text-sm flex items-center gap-2">
+                          <Package className="w-3.5 h-3.5" />
+                          Product Details
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-slate-600">Product:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.productName || "Not provided"}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600">Weight:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.totalWeight || formData.weight || "0"} kg</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600">Boxes:</span>
+                            <span className="font-medium text-slate-900 ml-2">{formData.numberOfBoxes || "0"}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600">Value:</span>
+                            <span className="font-medium text-slate-900 ml-2">₹{formData.declaredValue || "0"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Summary */}
+                      <div className="bg-slate-50 border border-slate-200 rounded p-3">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-slate-900 text-sm">Total Shipping Cost:</span>
+                          <span className="text-lg font-semibold text-slate-900">₹{costs.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 flex justify-between">
+                    <Button type="button" variant="outline" onClick={goToPreviousStep} className="border-slate-300 hover:bg-slate-50">
+                      <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+                    </Button>
+                    <Button type="submit" className="bg-slate-900 hover:bg-slate-800">
+                      <Save className="w-4 h-4 mr-2" />
+                      Create Consignment
+                    </Button>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+            </Accordion>
+          </div>
+
+          {/* Sidebar - Summary & Actions */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-4 border border-slate-200 shadow-sm">
+              <CardHeader className="bg-slate-50/50 rounded-t border-b border-slate-200">
+                <CardTitle className="text-slate-900 font-medium text-sm flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-slate-600" />
+                  Consignment Summary
+                    </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <Badge className="bg-slate-100 text-slate-700 border border-slate-200 w-full justify-center py-1.5 text-xs">
+                  <Shield className="w-3.5 h-3.5 mr-2" />
+                        B2B Consignment
+                      </Badge>
+
+                {/* Completion Status */}
+                {missingFields.length > 0 && (
+                  <div className="text-xs text-slate-600 pt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span>Completion</span>
+                      <span className="font-medium text-amber-600">
+                        {Math.max(0, Math.round(((15 - missingFields.length) / 15) * 100))}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5">
+                      <div
+                        className="bg-amber-500 h-1.5 rounded-full transition-all"
+                        style={{ width: `${Math.max(0, ((15 - missingFields.length) / 15) * 100)}%` }}
+                      />
+                    </div>
+                      </div>
+                    )}
+
+                {/* Shipment Details */}
+                <div className="space-y-2 pt-2 border-t border-slate-200">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-600">Boxes</span>
+                    <span className="font-medium text-slate-900">{formData.numberOfBoxes || "0"} {formData.numberOfBoxes === "1" ? 'box' : 'boxes'}</span>
+                        </div>
+                  {formData.totalWeight && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-600">Total Weight</span>
+                      <span className="font-medium text-slate-900">{formData.totalWeight} kg</span>
+                  </div>
+                  )}
+                  {chargeableWeight && parseFloat(chargeableWeight) > 0 && (
+                      <div className="flex justify-between text-xs">
+                      <span className="text-slate-600">Chargeable Weight</span>
+                      <span className="font-semibold text-slate-700">{chargeableWeight} kg</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Appointment Status */}
+                {formData.slotDate && formData.slotTime && (
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    <div className="text-xs text-slate-600">
+                      <div className="font-medium text-slate-700 mb-1">Appointment</div>
+                      <div className="space-y-1">
+                        <div>
+                          <span className="text-slate-500">Date:</span>{" "}
+                          <span className="font-medium text-slate-900">{formData.slotDate}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Time:</span>{" "}
+                          <span className="font-medium text-slate-900">{formData.slotTime}</span>
+                        </div>
+                        {formData.warehouseLocation && (
+                          <div>
+                            <span className="text-slate-500">Location:</span>{" "}
+                            <span className="font-medium text-slate-900">
+                              {formData.warehouseLocation.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </span>
+                    </div>
+                  )}
+                        {formData.appointmentStatus && (
+                          <div className="mt-2">
+                            <Badge
+                              className={
+                                formData.appointmentStatus === "confirmed"
+                                  ? "bg-green-100 text-green-700 border border-green-200 text-[10px]"
+                                  : formData.appointmentStatus === "rejected"
+                                  ? "bg-red-100 text-red-700 border border-red-200 text-[10px]"
+                                  : "bg-amber-100 text-amber-700 border border-amber-200 text-[10px]"
+                              }
+                            >
+                              {formData.appointmentStatus === "confirmed"
+                                ? "✓ Confirmed"
+                                : formData.appointmentStatus === "rejected"
+                                ? "✗ Rejected"
+                                : "⏳ Requested"}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Invoice Info */}
+                {formData.invoiceNumber && (
+                  <div className="text-xs text-slate-600 pt-2 border-t border-slate-200">
+                    <span className="text-slate-500">Invoice:</span>{" "}
+                    <span className="font-medium text-slate-900">{formData.invoiceNumber}</span>
+                  </div>
+                )}
+
+                {/* Missing Fields Warning */}
+                {missingFields.length > 0 && (
+                  <Alert className="bg-amber-50/50 border-amber-200">
+                    <Info className="h-3.5 w-3.5 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800">
+                      <div className="font-medium mb-1">Complete these steps:</div>
+                      <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                        {missingFields.slice(0, 3).map((field, idx) => (
+                          <li key={idx}>{field}</li>
+                        ))}
+                        {missingFields.length > 3 && (
+                          <li className="text-amber-700">+{missingFields.length - 3} more</li>
+                        )}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Cost Breakdown */}
+                <div className="space-y-2 pt-2 border-t border-slate-200">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Shipping</span>
+                    <span className="font-semibold text-slate-800">₹{costs.shipping.toFixed(2)}</span>
+                  </div>
+                  {formData.paymentMode === "cod" && (
+                    <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">COD Charges</span>
+                      <span className="font-semibold text-slate-700">₹{costs.cod.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-200 pt-2">
+                    <div className="flex justify-between font-semibold text-base">
+                        <span className="text-slate-900">Total</span>
+                      <span className="text-slate-900">₹{costs.total.toFixed(2)}</span>
+                  </div>
+                </div>
+                </div>
+
+                {!orderConfirmed ? (
+                      <div className="space-y-2 pt-3 border-t border-slate-200">
+                    <Button
+                      type="submit"
+                      disabled={!isFormValid}
+                      className={`w-full font-medium py-2.5 text-sm ${
+                        isFormValid
+                          ? "bg-slate-900 hover:bg-slate-800 text-white"
+                          : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                      }`}
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      {isFormValid ? "Create Consignment" : "Complete Required Steps"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-slate-300 hover:bg-slate-100 text-slate-800"
+                      onClick={onSaveDraft}
+                    >
+                      Save as Draft
+                    </Button>
+                  </div>
+                ) : (
+                      <div className="space-y-3 pt-4 border-t border-slate-300">
+                        <div className="p-3 bg-slate-900 rounded border border-slate-700">
+                      <div className="flex items-center gap-2 text-slate-50">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <p className="text-xs font-semibold">Consignment Created!</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-300 hover:bg-slate-100 text-slate-800 text-xs"
+                        onClick={() => onGenerateDocument("manifest")}
+                        disabled={generatedDocuments.manifest}
+                      >
+                        <FileText className="w-3 h-3 mr-1" />
+                        Manifest
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-300 hover:bg-slate-100 text-slate-800 text-xs"
+                        onClick={() => onGenerateDocument("gst")}
+                        disabled={generatedDocuments.gst}
+                      >
+                        <Receipt className="w-3 h-3 mr-1" />
+                        GST
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-300 hover:bg-slate-100 text-slate-800 text-xs"
+                        onClick={() => onGenerateDocument("awb")}
+                        disabled={generatedDocuments.awb}
+                      >
+                        <FileCheck className="w-3 h-3 mr-1" />
+                        AWB
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-300 hover:bg-slate-100 text-slate-800 text-xs"
+                        onClick={() => onGenerateDocument("label")}
+                        disabled={generatedDocuments.label}
+                      >
+                        <FileText className="w-3 h-3 mr-1" />
+                        Label
+                      </Button>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-slate-300 hover:bg-slate-100 text-slate-800 text-xs"
+                      onClick={onExportCSV}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                          Export CSV
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-slate-300 hover:bg-slate-100 text-slate-800 text-xs"
+                      onClick={onGenerateInvoice}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Generate Invoice
+                    </Button>
+                    <Button
+                      type="button"
+                      className="w-full bg-slate-900 hover:bg-black text-white text-sm"
+                      onClick={onConfirm}
+                    >
+                      Confirm & Finish
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// Main CreateOrder Component
 const CreateOrder = () => {
   const navigate = useNavigate();
-  // Load persisted mode from localStorage, default to "b2c"
   const [orderType, setOrderType] = useState<"b2c" | "b2b">(() => {
     const saved = localStorage.getItem("createOrderMode");
     return (saved === "b2c" || saved === "b2b" ? saved : "b2c") as "b2c" | "b2b";
   });
 
-  // Persist mode selection
   useEffect(() => {
     localStorage.setItem("createOrderMode", orderType);
   }, [orderType]);
 
-  const [orderData, setOrderData] = useState({
-    // Customer Details
+  // B2C Form Data
+  const [b2cData, setB2CData] = useState<B2CFormData>({
     customerName: "",
     customerPhone: "",
     customerEmail: "",
+    shippingAddress: "",
+    shippingCity: "",
+    shippingState: "",
+    shippingPincode: "",
+    productName: "",
+    boxes: [
+      {
+        id: `box-${Date.now()}`,
+        weight: "",
+        length: "",
+        breadth: "",
+        height: "",
+        productReference: "",
+      },
+    ],
+    totalWeight: "",
+    declaredValue: "",
+    paymentMode: "prepaid",
+    codAmount: "",
+    giftWrap: false,
+  });
 
-    // Pickup Address
+  // B2B Form Data
+  const [b2bData, setB2BData] = useState<B2BFormData>({
+    companyName: "",
+    gstNumber: "",
+    customerName: "",
+    customerPhone: "",
+    customerEmail: "",
     pickupName: "",
     pickupAddress: "",
     pickupCity: "",
@@ -77,14 +1974,10 @@ const CreateOrder = () => {
     pickupPincode: "",
     pickupPhone: "",
     pickupEmail: "",
-
-    // Shipping Address
     shippingAddress: "",
     shippingCity: "",
     shippingState: "",
     shippingPincode: "",
-
-    // Order Details
     orderId: "",
     productName: "",
     quantity: "1",
@@ -97,27 +1990,15 @@ const CreateOrder = () => {
     declaredValue: "",
     paymentMode: "prepaid",
     codAmount: "",
-
-    // B2B Specific Fields
-    companyName: "",
-    gstNumber: "",
     invoiceNumber: "",
     ewayBillNumber: "",
     slotDate: "",
     slotTime: "",
-    podFile: null as File | null,
-    invoiceFile: null as File | null,
-    ewayBillFile: null as File | null,
-
-    // B2C Specific Fields
-    giftWrap: false,
-
-    // Courier Selection
-    courier: "auto",
-    serviceType: "standard",
-
-    // Additional
-    notes: "",
+    warehouseLocation: "",
+    appointmentStatus: "",
+    invoiceFile: null,
+    ewayBillFile: null,
+    podFile: null,
   });
 
   const [orderConfirmed, setOrderConfirmed] = useState(false);
@@ -127,7 +2008,6 @@ const CreateOrder = () => {
     awb: false,
     label: false,
   });
-  const [podFileName, setPodFileName] = useState<string>("");
   const [invoiceFileName, setInvoiceFileName] = useState<string>("");
   const [ewayBillFileName, setEwayBillFileName] = useState<string>("");
 
@@ -152,13 +2032,12 @@ const CreateOrder = () => {
         return;
       }
       if (type === "pod") {
-      setOrderData({ ...orderData, podFile: file });
-      setPodFileName(file.name);
+        setB2BData({ ...b2bData, podFile: file });
       } else if (type === "invoice") {
-        setOrderData({ ...orderData, invoiceFile: file });
+        setB2BData({ ...b2bData, invoiceFile: file });
         setInvoiceFileName(file.name);
       } else if (type === "ewayBill") {
-        setOrderData({ ...orderData, ewayBillFile: file });
+        setB2BData({ ...b2bData, ewayBillFile: file });
         setEwayBillFileName(file.name);
       }
       toast.success("File uploaded successfully");
@@ -167,13 +2046,12 @@ const CreateOrder = () => {
 
   const handleRemoveFile = (type: "pod" | "invoice" | "ewayBill") => {
     if (type === "pod") {
-    setOrderData({ ...orderData, podFile: null });
-    setPodFileName("");
+      setB2BData({ ...b2bData, podFile: null });
     } else if (type === "invoice") {
-      setOrderData({ ...orderData, invoiceFile: null });
+      setB2BData({ ...b2bData, invoiceFile: null });
       setInvoiceFileName("");
     } else if (type === "ewayBill") {
-      setOrderData({ ...orderData, ewayBillFile: null });
+      setB2BData({ ...b2bData, ewayBillFile: null });
       setEwayBillFileName("");
     }
     toast.info("File removed");
@@ -181,13 +2059,30 @@ const CreateOrder = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate appointment booking for B2B
+    if (orderType === "b2b") {
+      if (!b2bData.slotDate || !b2bData.slotTime || !b2bData.warehouseLocation) {
+        toast.error("Please complete the appointment booking section before submitting.");
+        return;
+      }
+      if (b2bData.appointmentStatus === "" || b2bData.appointmentStatus === "rejected") {
+        toast.error("Please request and confirm your appointment before submitting the consignment.");
+        return;
+      }
+    }
+    
     setOrderConfirmed(true);
-    toast.success("Order created successfully!");
+    toast.success(orderType === "b2c" ? "Shipment created successfully!" : "Consignment created successfully!");
   };
 
   const handleConfirmOrder = () => {
     toast.success("Order confirmed!");
     navigate("/dashboard/orders");
+  };
+
+  const handleSaveDraft = () => {
+    toast.success("Order saved as draft!");
   };
 
   const handleGenerateDocument = (
@@ -197,115 +2092,10 @@ const CreateOrder = () => {
     toast.success(`${type.toUpperCase()} generated successfully!`);
   };
 
-  // Autosave pickup address to pickup management
-  const autosavePickupAddress = () => {
-    if (
-      orderData.pickupAddress &&
-      orderData.pickupCity &&
-      orderData.pickupPincode
-    ) {
-      const savedAddresses = JSON.parse(
-        localStorage.getItem("pickupAddresses") || "[]"
-      );
-      const newAddress = {
-        id: Date.now(),
-        name:
-          orderData.pickupName || `Pickup ${new Date().toLocaleDateString()}`,
-        address: orderData.pickupAddress,
-        city: orderData.pickupCity,
-        state: orderData.pickupState,
-        pincode: orderData.pickupPincode,
-        phone: orderData.pickupPhone,
-        email: orderData.pickupEmail,
-        isDefault: savedAddresses.length === 0,
-        status: "Active",
-      };
-
-      const exists = savedAddresses.some(
-        (addr: any) =>
-          addr.address === newAddress.address &&
-          addr.pincode === newAddress.pincode
-      );
-
-      if (!exists) {
-        savedAddresses.push(newAddress);
-        localStorage.setItem("pickupAddresses", JSON.stringify(savedAddresses));
-        toast.success("Pickup address auto-saved to Pickup Management!");
-      }
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (
-        orderData.pickupAddress &&
-        orderData.pickupCity &&
-        orderData.pickupPincode
-      ) {
-        autosavePickupAddress();
-      }
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [
-    orderData.pickupAddress,
-    orderData.pickupCity,
-    orderData.pickupState,
-    orderData.pickupPincode,
-    orderData.pickupPhone,
-    orderData.pickupEmail,
-    orderData.pickupName,
-  ]);
-
-  // Compute total weight
-  useEffect(() => {
-    const L = parseFloat(orderData.boxLength || "0");
-    const H = parseFloat(orderData.boxHeight || "0");
-    const B = parseFloat(orderData.boxBreadth || "0");
-    const numBoxes = parseInt(orderData.numberOfBoxes || "0") || 0;
-    const perBoxWeightInput = parseFloat(orderData.weight || "0") || 0;
-
-    const volumetricPerBox = L && H && B ? (L * H * B) / 5000 : 0;
-    const perBoxComputed = Math.max(perBoxWeightInput, volumetricPerBox);
-    const total = numBoxes > 0 ? perBoxComputed * numBoxes : perBoxComputed;
-    const totalRounded = isFinite(total) && total > 0 ? total.toFixed(2) : "";
-
-    if (totalRounded !== orderData.totalWeight) {
-      setOrderData((prev) => ({ ...prev, totalWeight: totalRounded }));
-    }
-  }, [
-    orderData.boxLength,
-    orderData.boxHeight,
-    orderData.boxBreadth,
-    orderData.weight,
-    orderData.numberOfBoxes,
-  ]);
-
   const handleExportCSV = () => {
-    const invoiceNum =
-      orderType === "b2b" ? orderData.invoiceNumber : `INV-${Date.now()}`;
-    const slotInfo =
-      orderType === "b2b" ? `${orderData.slotDate} ${orderData.slotTime}` : "";
-
     const csvContent = [
       "Order Type,Order ID,Customer Name,Phone,Email,From Address,From City,From State,From Pincode,To Address,To City,To State,To Pincode,Product Name,Quantity,Number of Boxes,Weight per Box (kg),Box Length (cm),Box Height (cm),Box Breadth (cm),Total Weight (kg),Declared Value,Payment Mode,COD Amount,Invoice Number,Pickup Slot",
-      `"${orderType.toUpperCase()}","${orderData.orderId || "AUTO"}","${
-        orderData.customerName
-      }","${orderData.customerPhone}","${orderData.customerEmail}","${
-        orderData.pickupAddress
-      }","${orderData.pickupCity}","${orderData.pickupState}","${
-        orderData.pickupPincode
-      }","${orderData.shippingAddress}","${orderData.shippingCity}","${
-        orderData.shippingState
-      }","${orderData.shippingPincode}","${orderData.productName}","${
-        orderData.quantity
-      }","${orderData.numberOfBoxes}","${orderData.weight}","${
-        orderData.boxLength
-      }","${orderData.boxHeight}","${orderData.boxBreadth}","${
-        orderData.totalWeight
-      }","${orderData.declaredValue}","${orderData.paymentMode}","${
-        orderData.codAmount || "0"
-      }","${invoiceNum}","${slotInfo}"`,
+      `"B2B","${b2bData.orderId || "AUTO"}","${b2bData.customerName}","${b2bData.customerPhone}","${b2bData.customerEmail}","${b2bData.pickupAddress}","${b2bData.pickupCity}","${b2bData.pickupState}","${b2bData.pickupPincode}","${b2bData.shippingAddress}","${b2bData.shippingCity}","${b2bData.shippingState}","${b2bData.shippingPincode}","${b2bData.productName}","${b2bData.quantity}","${b2bData.numberOfBoxes}","${b2bData.weight}","${b2bData.boxLength}","${b2bData.boxHeight}","${b2bData.boxBreadth}","${b2bData.totalWeight}","${b2bData.declaredValue}","${b2bData.paymentMode}","${b2bData.codAmount || "0"}","${b2bData.invoiceNumber}","${b2bData.slotDate} ${b2bData.slotTime}"`,
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv" });
@@ -313,9 +2103,7 @@ const CreateOrder = () => {
     const a = document.createElement("a");
     a.href = url;
     const dateStr = new Date().toISOString().split("T")[0];
-    a.download = `order_${orderType}_${
-      orderData.orderId || "export"
-    }_${dateStr}.csv`;
+    a.download = `order_b2b_${b2bData.orderId || "export"}_${dateStr}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
     toast.success("CSV exported successfully!");
@@ -332,1422 +2120,197 @@ const CreateOrder = () => {
   };
 
   const handleGenerateInvoice = () => {
-    const invoiceNum =
-      orderData.orderId || orderData.invoiceNumber || `INV-${Date.now()}`;
+    const invoiceNum = b2bData.orderId || b2bData.invoiceNumber || `INV-${Date.now()}`;
     const dateStr = new Date().toLocaleString();
-
-    const rows: Array<{ label: string; value: string }> = [];
-    const fieldLabels: Record<string, string> = {
-      orderId: "Order ID",
-      invoiceNumber: "Invoice Number",
-      customerName: "Customer Name",
-      customerPhone: "Phone",
-      customerEmail: "Email",
-      pickupAddress: "Pickup Address",
-      pickupCity: "Pickup City",
-      pickupState: "Pickup State",
-      pickupPincode: "Pickup Pincode",
-      shippingAddress: "Shipping Address",
-      shippingCity: "Shipping City",
-      shippingState: "Shipping State",
-      shippingPincode: "Shipping Pincode",
-      productName: "Product",
-      quantity: "Quantity",
-      numberOfBoxes: "Number of Boxes",
-      weight: "Weight per Box (kg)",
-      boxLength: "Box Length (cm)",
-      boxHeight: "Box Height (cm)",
-      boxBreadth: "Box Breadth (cm)",
-      totalWeight: "Total Weight (kg)",
-      declaredValue: "Declared Value (₹)",
-      paymentMode: "Payment Mode",
-      codAmount: "COD Amount (₹)",
-      courier: "Courier",
-      serviceType: "Service Type",
-      notes: "Notes",
-    };
-
-    for (const key of Object.keys(orderData)) {
-      const val = (orderData as any)[key];
-      if (val === null || val === undefined || val === "") continue;
-      if (key === "podFile" || key === "invoiceFile" || key === "ewayBillFile") {
-        if (val) rows.push({ label: key, value: (val as File).name || key });
-        continue;
-      }
-      const label = fieldLabels[key] || key;
-      rows.push({ label, value: String(val) });
-    }
-
-    const html = `<!doctype html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <title>Invoice - ${escapeHtml(invoiceNum)}</title>
-      <style>
-        body { font-family: Inter, Arial, sans-serif; padding: 24px; color: #0f172a; }
-        .invoice { max-width: 800px; margin: 0 auto; border: 1px solid #e6edf3; padding: 24px; }
-        .header { display:flex; justify-content:space-between; align-items:center; }
-        h1 { margin:0; font-size:24px; }
-        table { width:100%; border-collapse:collapse; margin-top:16px; }
-        td, th { padding:8px 10px; border:1px solid #e6edf3; text-align:left; }
-        .meta { margin-top:8px; font-size:14px; }
-        .print { margin-top:16px; display:flex; gap:8px; }
-        .btn { padding:8px 12px; background:#0ea5e9; color:white; border-radius:6px; text-decoration:none; }
-      </style>
-    </head>
-    <body>
-      <div class="invoice">
-        <div class="header">
-          <div>
-            <h1>Swiftora - Invoice</h1>
-            <div class="meta">Invoice: <strong>${escapeHtml(
-              invoiceNum
-            )}</strong></div>
-            <div class="meta">Date: ${escapeHtml(dateStr)}</div>
-          </div>
-          <div style="text-align:right">
-            <div><strong>Swiftora</strong></div>
-            <div>Address: 123 Logistics Park</div>
-            <div>Contact: support@swiftora.example</div>
-          </div>
-        </div>
-        <table>
-          <thead>
-            <tr><th>Field</th><th>Value</th></tr>
-          </thead>
-          <tbody>
-            ${rows
-              .map(
-                (r) =>
-                  `<tr><td>${escapeHtml(r.label)}</td><td>${escapeHtml(
-                    r.value
-                  )}</td></tr>`
-              )
-              .join("")}
-          </tbody>
-        </table>
-        <div class="print">
-          <a href="#" class="btn" onclick="window.print();return false;">Print Invoice</a>
-        </div>
-      </div>
-    </body>
-    </html>`;
-
-    const w = window.open("", "_blank");
-    if (!w) {
-      toast.error("Popup blocked: allow popups for this site to generate invoice.");
-      return;
-    }
-    w.document.write(html);
-    w.document.close();
+    toast.success("Invoice generated!");
+    // Invoice generation logic would go here
   };
 
-  const handleSaveDraft = () => {
-    toast.success("Order saved as draft!");
-  };
+  // Autosave pickup address for B2B
+  useEffect(() => {
+    if (orderType === "b2b" && b2bData.pickupAddress && b2bData.pickupCity && b2bData.pickupPincode) {
+      const timer = setTimeout(() => {
+        const savedAddresses = JSON.parse(
+          localStorage.getItem("pickupAddresses") || "[]"
+        );
+        const newAddress = {
+          id: Date.now(),
+          name: b2bData.pickupName || `Pickup ${new Date().toLocaleDateString()}`,
+          address: b2bData.pickupAddress,
+          city: b2bData.pickupCity,
+          state: b2bData.pickupState,
+          pincode: b2bData.pickupPincode,
+          phone: b2bData.pickupPhone,
+          email: b2bData.pickupEmail,
+          isDefault: savedAddresses.length === 0,
+          status: "Active",
+        };
 
-  // Segmented Control Component
-  const SegmentedControl = () => (
-        <div className={`flex items-center gap-2 p-1.5 rounded-xl border-2 transition-all duration-300 ${
-          orderType === "b2c" 
-            ? "bg-blue-100 border-blue-300" 
-            : "bg-slate-200 border-slate-400"
-        }`}>
-          <button
-            type="button"
-            onClick={() => setOrderType("b2c")}
-            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all duration-300 ${
-              orderType === "b2c"
-                ? "bg-blue-600 text-white shadow-lg scale-105"
-                : "text-blue-700 hover:text-blue-800 bg-transparent"
-            }`}
-          >
-            <Box className="w-4 h-4" />
-            B2C (Retail Shipments)
-          </button>
-          <button
-            type="button"
-            onClick={() => setOrderType("b2b")}
-            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all duration-300 ${
-              orderType === "b2b"
-                ? "bg-slate-800 text-white shadow-lg scale-105"
-                : "text-slate-700 hover:text-slate-900 bg-transparent"
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            B2B (Bulk / GST Shipments)
-          </button>
-        </div>
-  );
+        const exists = savedAddresses.some(
+          (addr: any) =>
+            addr.address === newAddress.address &&
+            addr.pincode === newAddress.pincode
+        );
+
+        if (!exists) {
+          savedAddresses.push(newAddress);
+          localStorage.setItem("pickupAddresses", JSON.stringify(savedAddresses));
+          toast.success("Pickup address auto-saved!");
+        }
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [b2bData.pickupAddress, b2bData.pickupCity, b2bData.pickupPincode, b2bData.pickupName, b2bData.pickupPhone, b2bData.pickupEmail, orderType]);
 
   return (
     <div
-      className={`space-y-8 transition-colors duration-500 ${
-        orderType === "b2c" ? "bg-blue-50" : "bg-slate-100"
+      className={`min-h-screen transition-colors duration-500 ${
+        orderType === "b2c" ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-slate-50 to-slate-100"
       }`}
     >
-      {/* Header with Segmented Control */}
-      <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          asChild
-          className="hover:bg-blue-50 border border-blue-200 rounded-xl text-blue-600 hover:shadow-md transition-all"
-        >
-          <Link to="/dashboard/orders">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-4xl font-bold mb-2">
-              <span className="text-gray-900">Create New </span>
-              <span
-                className={`${
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className={`hover:shadow-md transition-all ${
+                orderType === "b2c"
+                  ? "hover:bg-blue-50 border border-blue-200 text-blue-600"
+                  : "hover:bg-slate-50 border border-slate-200 text-slate-600"
+              }`}
+            >
+              <Link to="/dashboard/orders">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className={`text-4xl font-bold mb-2 ${
+                orderType === "b2c" ? "text-blue-900" : "text-slate-900"
+              }`}>
+                Create New {orderType === "b2c" ? "Shipment" : "Consignment"}
+              </h1>
+              <p className={`text-lg ${
+                orderType === "b2c" ? "text-blue-700" : "text-slate-600"
+              }`}>
+                {orderType === "b2c"
+                  ? "Fast and simple retail shipment creation"
+                  : "Enterprise bulk shipment with GST compliance & appointment scheduling"}
+              </p>
+            </div>
+          </div>
+
+          {/* Mode Selector - Prominent */}
+          <div className="max-w-2xl">
+            <div className={`flex items-center gap-1.5 p-1 rounded-lg border transition-all duration-300 ${
+              orderType === "b2c"
+                ? "bg-blue-50 border-blue-200"
+                : "bg-slate-50 border-slate-200"
+            }`}>
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderType("b2c");
+                  setOrderConfirmed(false);
+                }}
+                className={`flex-1 flex items-center justify-center gap-2 px-6 py-2.5 rounded-md font-medium text-sm transition-all duration-300 ${
                   orderType === "b2c"
-                    ? "text-blue-600"
-                    : "text-slate-700"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-blue-700 hover:text-blue-800 bg-transparent"
                 }`}
               >
-                {orderType === "b2c" ? "Shipment" : "Consignment"}
-            </span>
-          </h1>
-            <p className="text-gray-600 text-lg">
-              {orderType === "b2c"
-                ? "Quick and simple retail shipment creation"
-                : "Enterprise bulk shipment with GST compliance"}
-          </p>
+                <Zap className="w-4 h-4" />
+                B2C (Fast Shipments)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderType("b2b");
+                  setOrderConfirmed(false);
+                }}
+                className={`flex-1 flex items-center justify-center gap-2 px-6 py-2.5 rounded-md font-medium text-sm transition-all duration-300 ${
+                  orderType === "b2b"
+                    ? "bg-slate-700 text-white shadow-sm"
+                    : "text-slate-700 hover:text-slate-900 bg-transparent"
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                B2B (Enterprise)
+              </button>
+            </div>
+            {orderType === "b2c" && (
+              <p className="text-sm text-blue-600 mt-3 ml-2 font-medium">
+                ⚡ Best for individual customers and small parcels
+              </p>
+            )}
+            {orderType === "b2b" && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="mt-3"
+              >
+                <Alert className="bg-amber-50 border-amber-200">
+                  <Info className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800">
+                    <strong>B2B shipments require:</strong> GST details, invoice documents, and scheduled pickup appointment.
+                  </AlertDescription>
+                </Alert>
+              </motion.div>
+            )}
+          </div>
         </div>
-      </div>
 
-        {/* Prominent Segmented Control */}
-        <div className="max-w-2xl">
-          <SegmentedControl />
-          {orderType === "b2c" && (
-            <p className="text-sm text-gray-500 mt-3 ml-2">
-              Best for individual customers and small parcels
-            </p>
-          )}
-        </div>
-
-        {/* B2B Info Banner */}
-        {orderType === "b2b" && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Alert className="bg-amber-50 border-amber-200">
-              <Info className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800">
-                <strong>B2B shipments require GST, invoice, and compliance details.</strong> Please ensure all documents are ready before proceeding.
-              </AlertDescription>
-            </Alert>
-          </motion.div>
-        )}
-      </div>
-
-      <form onSubmit={handleSubmit}>
+        {/* Form Content - Completely Separate */}
         <AnimatePresence mode="wait">
           {orderType === "b2c" ? (
             <motion.div
               key="b2c"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
-              {/* B2C Main Form - Lightweight */}
-          <div className="lg:col-span-2 space-y-6">
-                {/* Customer Details - Minimal */}
-                <Card className="bg-white border-2 border-blue-300 rounded-3xl shadow-lg hover:shadow-xl transition-all">
-                  <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-3xl">
-                    <CardTitle className="flex items-center gap-3 text-blue-900 font-bold">
-                      <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center border-2 border-blue-600 shadow-md">
-                        <User className="w-6 h-6 text-white" />
-                  </div>
-                      Customer Information
-                </CardTitle>
-                    <CardDescription className="text-blue-700 font-medium">
-                      Recipient details for delivery
-                </CardDescription>
-              </CardHeader>
-                  <CardContent className="space-y-4 pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                        <Label className="text-blue-900 font-semibold">Customer Name *</Label>
-                    <Input
-                      required
-                      value={orderData.customerName}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                          customerName: e.target.value,
-                        })
-                      }
-                      placeholder="John Doe"
-                          className="border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-300 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                        <Label className="text-blue-900 font-semibold">Phone Number *</Label>
-                    <Input
-                      required
-                      type="tel"
-                      value={orderData.customerPhone}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                          customerPhone: e.target.value,
-                        })
-                      }
-                      placeholder="+91 98765 43210"
-                          className="border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-300 rounded-xl"
-                    />
-                  </div>
-                </div>
-                <div>
-                      <Label className="text-blue-900 font-semibold">Email Address</Label>
-                  <Input
-                    type="email"
-                    value={orderData.customerEmail}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                        customerEmail: e.target.value,
-                      })
-                    }
-                    placeholder="customer@example.com"
-                        className="border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-300 rounded-xl"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-                {/* Delivery Address - Simple */}
-                <Card className="bg-white border-2 border-blue-300 rounded-3xl shadow-lg hover:shadow-xl transition-all">
-                  <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-3xl">
-                    <CardTitle className="flex items-center gap-3 text-blue-900 font-bold">
-                      <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center border-2 border-blue-600 shadow-md">
-                        <MapPin className="w-6 h-6 text-white" />
-                  </div>
-                      Delivery Address
-                </CardTitle>
-              </CardHeader>
-                  <CardContent className="space-y-4 pt-6">
-                <div>
-                      <Label className="text-blue-900 font-semibold">Address *</Label>
-                  <Textarea
-                    required
-                        value={orderData.shippingAddress}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                            shippingAddress: e.target.value,
-                      })
-                    }
-                    placeholder="Street address, building, apartment"
-                    rows={3}
-                        className="border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-300 rounded-xl"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                        <Label className="text-blue-900 font-semibold">City *</Label>
-                    <Input
-                      required
-                          value={orderData.shippingCity}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                              shippingCity: e.target.value,
-                        })
-                      }
-                      placeholder="Mumbai"
-                          className="border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-300 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                        <Label className="text-blue-900 font-semibold">State *</Label>
-                    <Input
-                      required
-                          value={orderData.shippingState}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                              shippingState: e.target.value,
-                        })
-                      }
-                      placeholder="Maharashtra"
-                          className="border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-300 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                        <Label className="text-blue-900 font-semibold">Pincode *</Label>
-                    <Input
-                      required
-                          value={orderData.shippingPincode}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                              shippingPincode: e.target.value,
-                        })
-                      }
-                      placeholder="400001"
-                      maxLength={6}
-                          className="border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-300 rounded-xl"
-                    />
-                  </div>
-                </div>
-                  </CardContent>
-                </Card>
-
-                {/* Product & Payment - Compact */}
-                <Card className="bg-white border-2 border-blue-300 rounded-3xl shadow-lg hover:shadow-xl transition-all">
-                  <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-3xl">
-                    <CardTitle className="flex items-center gap-3 text-blue-900 font-bold">
-                      <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center border-2 border-blue-600 shadow-md">
-                        <Package className="w-6 h-6 text-white" />
-                      </div>
-                      Product & Payment
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-6">
-                  <div>
-                      <Label className="text-gray-700">Product Name *</Label>
-                    <Input
-                        required
-                        value={orderData.productName}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                            productName: e.target.value,
-                        })
-                      }
-                        placeholder="Product description"
-                        className="border-gray-200 focus:border-blue-500"
-                    />
-                  </div>
-                    <div className="grid grid-cols-2 gap-4">
-                  <div>
-                        <Label className="text-gray-700">Weight (kg) *</Label>
-                    <Input
-                          required
-                          type="number"
-                          step="0.1"
-                          value={orderData.weight}
-                          onChange={(e) =>
-                            setOrderData({ ...orderData, weight: e.target.value })
-                          }
-                          placeholder="0.5"
-                          className="border-gray-200 focus:border-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-gray-700">Declared Value (₹) *</Label>
-                        <Input
-                          required
-                          type="number"
-                          value={orderData.declaredValue}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                              declaredValue: e.target.value,
-                        })
-                      }
-                          placeholder="1000"
-                          className="border-gray-200 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-                    <div>
-                      <Label className="text-gray-700">Payment Type *</Label>
-                      <RadioGroup
-                        value={orderData.paymentMode}
-                        onValueChange={(value) =>
-                          setOrderData({ ...orderData, paymentMode: value })
-                        }
-                        className="flex gap-6 mt-2"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="prepaid" id="prepaid" />
-                          <Label htmlFor="prepaid" className="cursor-pointer text-gray-700">
-                            Prepaid
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="cod" id="cod" />
-                          <Label htmlFor="cod" className="cursor-pointer text-gray-700">
-                            COD
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                    {orderData.paymentMode === "cod" && (
-                      <div>
-                        <Label className="text-gray-700">COD Amount (₹) *</Label>
-                        <Input
-                          required
-                          type="number"
-                          value={orderData.codAmount}
-                          onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                              codAmount: e.target.value,
-                            })
-                          }
-                          placeholder="Enter COD amount"
-                          className="border-gray-200 focus:border-blue-500"
-                        />
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2 pt-2">
-                      <Checkbox
-                        id="giftWrap"
-                        checked={orderData.giftWrap}
-                        onCheckedChange={(checked) =>
-                          setOrderData({ ...orderData, giftWrap: !!checked })
-                        }
-                      />
-                      <Label htmlFor="giftWrap" className="cursor-pointer text-gray-700">
-                        Add gift wrap (extra ₹50)
-                      </Label>
-                </div>
-              </CardContent>
-            </Card>
-              </div>
-
-              {/* B2C Sidebar */}
-              <div className="lg:col-span-1">
-                <Card className="sticky top-4 bg-white border-2 border-blue-400 rounded-3xl shadow-xl">
-                  <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-t-3xl">
-                    <CardTitle className="text-white font-bold text-lg">Order Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-6">
-                    <div className="p-4 bg-blue-100 rounded-xl border-2 border-blue-400 shadow-md">
-                      <Badge className="bg-blue-600 text-white text-sm font-bold px-3 py-1">B2C Shipment</Badge>
-                  </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Shipping Charges</span>
-                      <span className="font-semibold text-blue-600">
-                        ₹{orderData.weight ? (parseFloat(orderData.weight) * 50).toFixed(2) : "0.00"}
-                      </span>
-                    </div>
-                    {orderData.paymentMode === "cod" && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">COD Charges</span>
-                        <span className="font-semibold text-blue-600">
-                          ₹{orderData.codAmount ? (parseFloat(orderData.codAmount) * 0.02).toFixed(2) : "0.00"}
-                        </span>
-                      </div>
-                    )}
-                    <div className="border-t border-blue-200 pt-3">
-                      <div className="flex justify-between font-bold">
-                        <span className="text-gray-900">Total</span>
-                        <span className="text-blue-600">
-                          ₹{orderData.weight
-                            ? (
-                                parseFloat(orderData.weight) * 50 +
-                                (orderData.paymentMode === "cod" && orderData.codAmount
-                                  ? parseFloat(orderData.codAmount) * 0.02
-                                  : 0)
-                              ).toFixed(2)
-                            : "0.00"}
-                        </span>
-                      </div>
-                    </div>
-                    {!orderConfirmed ? (
-                      <div className="space-y-2 pt-4 border-t-2 border-blue-300">
-                        <Button
-                          type="submit"
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all font-bold text-base py-6 rounded-xl"
-                        >
-                          <Save className="w-5 h-5 mr-2" />
-                          Create Shipment
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full border-gray-300 hover:bg-blue-50"
-                          onClick={handleSaveDraft}
-                        >
-                          Save as Draft
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 pt-4 border-t border-blue-200">
-                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-sm font-semibold text-green-800">
-                            Shipment Created Successfully!
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={handleConfirmOrder}
-                        >
-                          Confirm & Finish
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+              <B2CFastForm
+                formData={b2cData}
+                setFormData={setB2CData}
+                onSubmit={handleSubmit}
+                onSaveDraft={handleSaveDraft}
+                orderConfirmed={orderConfirmed}
+                onConfirm={handleConfirmOrder}
+              />
             </motion.div>
           ) : (
             <motion.div
               key="b2b"
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 16 }}
-              transition={{ duration: 0.25 }}
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
             >
-              {/* B2B Main Form - Structured, enterprise-heavy */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Company & GST Details */}
-                <Card className="bg-white border border-slate-300 rounded-md shadow-sm">
-                  <CardHeader className="bg-slate-900 border-b border-slate-800">
-                    <CardTitle className="flex items-center gap-3 text-slate-50 font-semibold text-base">
-                      <div className="w-10 h-10 bg-slate-800 flex items-center justify-center border border-slate-700">
-                        <Building2 className="w-5 h-5 text-slate-100" />
-                      </div>
-                      Company & GST Details
-                </CardTitle>
-                    <CardDescription className="text-slate-400 text-xs">
-                      Business information and tax compliance
-                </CardDescription>
-              </CardHeader>
-                  <CardContent className="space-y-4 pt-6 bg-slate-50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Company Name *
-                        </Label>
-                        <Input
-                    required
-                          value={orderData.companyName}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                              companyName: e.target.value,
-                      })
-                    }
-                          placeholder="Company Pvt. Ltd."
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                  />
-                </div>
-                  <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          GST Number *
-                        </Label>
-                    <Input
-                      required
-                          value={orderData.gstNumber}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                              gstNumber: e.target.value,
-                        })
-                      }
-                          placeholder="27AAAAA0000A1Z5"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Customer Name *
-                        </Label>
-                    <Input
-                      required
-                          value={orderData.customerName}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                              customerName: e.target.value,
-                        })
-                      }
-                          placeholder="Contact person name"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                  <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Phone Number *
-                        </Label>
-                    <Input
-                      required
-                          type="tel"
-                          value={orderData.customerPhone}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                              customerPhone: e.target.value,
-                        })
-                      }
-                          placeholder="+91 98765 43210"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                </div>
-                    <div>
-                      <Label className="text-slate-900 font-semibold text-xs">
-                        Email Address
-                      </Label>
-                      <Input
-                        type="email"
-                        value={orderData.customerEmail}
-                        onChange={(e) =>
-                          setOrderData({
-                            ...orderData,
-                            customerEmail: e.target.value,
-                          })
-                        }
-                        placeholder="contact@company.com"
-                        className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                      />
-                </div>
-              </CardContent>
-            </Card>
-
-                {/* Pickup & Drop Warehouses */}
-                <Card className="bg-white border border-slate-300 rounded-md shadow-sm">
-                  <CardHeader className="bg-slate-900 border-b border-slate-800">
-                    <CardTitle className="flex items-center gap-3 text-slate-50 font-semibold text-base">
-                      <div className="w-10 h-10 bg-slate-800 flex items-center justify-center border border-slate-700">
-                        <Truck className="w-5 h-5 text-slate-100" />
-                  </div>
-                      Pickup & Drop Warehouses
-                </CardTitle>
-                    <CardDescription className="text-slate-400 text-xs">
-                      Origin and destination warehouse details
-                </CardDescription>
-              </CardHeader>
-                  <CardContent className="space-y-6 pt-6 bg-slate-50">
-                <div>
-                      <h4 className="text-xs font-semibold text-slate-800 mb-3 uppercase tracking-wide">
-                        Pickup Address *
-                      </h4>
-                      <div className="space-y-4 pl-4 border-l border-slate-300">
-                        <div>
-                          <Label className="text-slate-700 text-xs">
-                            Location Name
-                  </Label>
-                  <Input
-                            value={orderData.pickupName}
-                    onChange={(e) =>
-                              setOrderData({ ...orderData, pickupName: e.target.value })
-                    }
-                            placeholder="Main Warehouse"
-                            className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                  />
-                </div>
-                  <div>
-                          <Label className="text-slate-700 text-xs">
-                            Address *
-                          </Label>
-                          <Textarea
-                            required
-                            value={orderData.pickupAddress}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                                pickupAddress: e.target.value,
-                        })
-                      }
-                            placeholder="Warehouse address"
-                            rows={3}
-                            className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                            <Label className="text-slate-700 text-xs">
-                              City *
-                            </Label>
-                  <Input
-                    required
-                              value={orderData.pickupCity}
-                    onChange={(e) =>
-                      setOrderData({
-                        ...orderData,
-                                  pickupCity: e.target.value,
-                      })
-                    }
-                              placeholder="Mumbai"
-                              className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                  />
-                </div>
-                  <div>
-                            <Label className="text-slate-700 text-xs">
-                              State *
-                            </Label>
-                    <Input
-                      required
-                              value={orderData.pickupState}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                                  pickupState: e.target.value,
-                        })
-                      }
-                              placeholder="Maharashtra"
-                              className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                  <div>
-                            <Label className="text-slate-700 text-xs">
-                              Pincode *
-                    </Label>
-                    <Input
-                      required
-                              value={orderData.pickupPincode}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                                  pickupPincode: e.target.value,
-                        })
-                      }
-                              placeholder="400001"
-                              maxLength={6}
-                              className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                </div>
-                    </div>
-                    </div>
-                  <div>
-                      <h4 className="text-xs font-semibold text-slate-800 mb-3 uppercase tracking-wide">
-                        Delivery Address *
-                      </h4>
-                      <div className="space-y-4 pl-4 border-l border-slate-300">
-                        <div>
-                          <Label className="text-slate-700 text-xs">
-                            Address *
-                          </Label>
-                          <Textarea
-                      required
-                            value={orderData.shippingAddress}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                                shippingAddress: e.target.value,
-                        })
-                      }
-                            placeholder="Delivery warehouse address"
-                            rows={3}
-                            className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                            <Label className="text-slate-700 text-xs">
-                              City *
-                            </Label>
-                    <Input
-                              required
-                              value={orderData.shippingCity}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                                  shippingCity: e.target.value,
-                        })
-                      }
-                              placeholder="Delhi"
-                              className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                  <div>
-                            <Label className="text-slate-700 text-xs">
-                              State *
-                            </Label>
-                    <Input
-                              required
-                              value={orderData.shippingState}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                                  shippingState: e.target.value,
-                        })
-                      }
-                              placeholder="Delhi"
-                              className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                  <div>
-                            <Label className="text-slate-700 text-xs">
-                              Pincode *
-                            </Label>
-                    <Input
-                              required
-                              value={orderData.shippingPincode}
-                      onChange={(e) =>
-                        setOrderData({
-                          ...orderData,
-                                  shippingPincode: e.target.value,
-                        })
-                      }
-                              placeholder="110001"
-                              className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                    />
-                  </div>
-                </div>
-                      </div>
-                </div>
-              </CardContent>
-            </Card>
-
-                {/* Invoice & E-way Bill Upload */}
-                <Card className="bg-white border border-slate-300 rounded-md shadow-sm">
-                  <CardHeader className="bg-slate-900 border-b border-slate-800">
-                    <CardTitle className="flex items-center gap-3 text-slate-50 font-semibold text-base">
-                      <div className="w-10 h-10 bg-slate-800 flex items-center justify-center border border-slate-700">
-                        <FileText className="w-5 h-5 text-slate-100" />
-                    </div>
-                      Invoice & E-way Bill Upload
-                  </CardTitle>
-                    <CardDescription className="text-slate-400 text-xs">
-                      Upload compliance documents
-                  </CardDescription>
-                </CardHeader>
-                  <CardContent className="space-y-6 pt-6 bg-slate-50">
-                  <div>
-                      <Label className="text-slate-900 font-semibold text-xs">
-                        Invoice Number *
-                    </Label>
-                        <Input
-                        required
-                        value={orderData.invoiceNumber}
-                          onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                            invoiceNumber: e.target.value,
-                            })
-                          }
-                        placeholder="INV-2025-001"
-                        className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                      </div>
-                      <div>
-                      <Label className="text-slate-900 font-semibold text-xs">
-                        E-way Bill Number
-                        </Label>
-                        <Input
-                        value={orderData.ewayBillNumber}
-                          onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                            ewayBillNumber: e.target.value,
-                            })
-                          }
-                        placeholder="EWB-XXXXXXXXXX"
-                        className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                      </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Invoice Upload *
-                        </Label>
-                        {!orderData.invoiceFile ? (
-                          <div className="mt-2">
-                            <label className="flex flex-col items-center justify-center w-full h-32 border border-dashed border-slate-400 rounded-sm cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <Upload className="w-8 h-8 mb-2 text-slate-600" />
-                                <p className="mb-2 text-sm text-slate-600">
-                                  <span className="font-semibold">Click to upload</span> invoice
-                                </p>
-                                <p className="text-xs text-slate-500">PNG, JPG, PDF (MAX. 5MB)</p>
-                              </div>
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept="image/jpeg,image/png,image/jpg,application/pdf"
-                                onChange={(e) => handleFileUpload(e, "invoice")}
-                              />
-                            </label>
-                          </div>
-                        ) : (
-                            <div className="mt-2 p-4 border border-slate-300 rounded-sm bg-slate-50 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <FileText className="w-5 h-5 text-slate-600" />
-                              <div>
-                                <p className="text-sm font-medium text-slate-900">{invoiceFileName}</p>
-                                <p className="text-xs text-slate-600">
-                                  {(orderData.invoiceFile!.size / 1024).toFixed(2)} KB
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="hover:bg-slate-200"
-                              onClick={() => handleRemoveFile("invoice")}
-                            >
-                              <X className="w-4 h-4 text-slate-600" />
-                            </Button>
-                    </div>
-                        )}
-                  </div>
-                  <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          E-way Bill Upload
-                        </Label>
-                        {!orderData.ewayBillFile ? (
-                      <div className="mt-2">
-                            <label className="flex flex-col items-center justify-center w-full h-32 border border-dashed border-slate-400 rounded-sm cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all">
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                <Upload className="w-8 h-8 mb-2 text-slate-600" />
-                                <p className="mb-2 text-sm text-slate-600">
-                                  <span className="font-semibold">Click to upload</span> e-way bill
-                                </p>
-                                <p className="text-xs text-slate-500">PNG, JPG, PDF (MAX. 5MB)</p>
-                          </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="image/jpeg,image/png,image/jpg,application/pdf"
-                                onChange={(e) => handleFileUpload(e, "ewayBill")}
-                          />
-                        </label>
-                      </div>
-                    ) : (
-                          <div className="mt-2 p-4 border border-slate-300 rounded-sm bg-slate-50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                              <FileText className="w-5 h-5 text-slate-600" />
-                          <div>
-                                <p className="text-sm font-medium text-slate-900">{ewayBillFileName}</p>
-                                <p className="text-xs text-slate-600">
-                                  {(orderData.ewayBillFile!.size / 1024).toFixed(2)} KB
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                              className="hover:bg-slate-200"
-                              onClick={() => handleRemoveFile("ewayBill")}
-                        >
-                              <X className="w-4 h-4 text-slate-600" />
-                        </Button>
-                      </div>
-                    )}
-                      </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-                {/* Shipment Dimensions / Boxes */}
-                <Card className="bg-white border border-slate-300 rounded-md shadow-sm">
-                  <CardHeader className="bg-slate-900 border-b border-slate-800">
-                    <CardTitle className="flex items-center gap-3 text-slate-50 font-semibold text-base">
-                      <div className="w-10 h-10 bg-slate-800 flex items-center justify-center border border-slate-700">
-                        <Scale className="w-5 h-5 text-slate-100" />
-                  </div>
-                      Shipment Dimensions / Boxes
-                </CardTitle>
-                    <CardDescription className="text-slate-400 text-xs">
-                      Product details and dimensions
-                </CardDescription>
-              </CardHeader>
-                  <CardContent className="space-y-4 pt-6 bg-slate-50">
-                <div>
-                      <Label className="text-slate-900 font-semibold text-xs">
-                        Order ID (Manual Booking)
-                      </Label>
-                      <Input
-                        value={orderData.orderId}
-                        onChange={(e) =>
-                          setOrderData({ ...orderData, orderId: e.target.value })
-                        }
-                        placeholder="Enter Order ID"
-                        className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                      />
-                </div>
-                <div>
-                      <Label className="text-slate-900 font-semibold text-xs">
-                        Product Name *
-                      </Label>
-                      <Input
-                        required
-                        value={orderData.productName}
-                        onChange={(e) =>
-                          setOrderData({
-                            ...orderData,
-                            productName: e.target.value,
-                          })
-                        }
-                        placeholder="Product description"
-                        className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                      />
-                </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Quantity *
-                        </Label>
-                        <Input
-                          required
-                          type="number"
-                          min="1"
-                          value={orderData.quantity}
-                          onChange={(e) =>
-                            setOrderData({ ...orderData, quantity: e.target.value })
-                          }
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                  </div>
-                <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Number of Boxes *
-                        </Label>
-                        <Input
-                          required
-                          type="number"
-                          min="1"
-                          value={orderData.numberOfBoxes}
-                          onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                              numberOfBoxes: e.target.value,
-                            })
-                          }
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                        </div>
-                      <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Weight (kg) *
-                        </Label>
-                        <Input
-                          required
-                          type="number"
-                          step="0.1"
-                          value={orderData.weight}
-                          onChange={(e) =>
-                            setOrderData({ ...orderData, weight: e.target.value })
-                          }
-                          placeholder="0.5"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                        </div>
-                      <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Declared Value (₹) *
-                        </Label>
-                        <Input
-                          required
-                          type="number"
-                          value={orderData.declaredValue}
-                          onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                              declaredValue: e.target.value,
-                            })
-                          }
-                          placeholder="1000"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Length (cm)
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          value={orderData.boxLength}
-                          onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                              boxLength: e.target.value,
-                            })
-                          }
-                          placeholder="30"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                        </div>
-                      <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Height (cm)
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          value={orderData.boxHeight}
-                          onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                              boxHeight: e.target.value,
-                            })
-                          }
-                          placeholder="20"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                        </div>
-                      <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          Breadth (cm)
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          value={orderData.boxBreadth}
-                          onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                              boxBreadth: e.target.value,
-                            })
-                          }
-                          placeholder="15"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                        </div>
-                </div>
-                    <div>
-                      <Label className="text-slate-900 font-semibold text-xs">
-                        Total Weight (kg)
-                      </Label>
-                      <Input
-                        readOnly
-                        value={orderData.totalWeight}
-                        placeholder="Auto-calculated"
-                        className="bg-slate-100 border border-slate-300 text-sm rounded-sm"
-                      />
-                </div>
-                    <div>
-                      <Label className="text-slate-900 font-semibold text-xs">
-                        Payment Mode *
-                      </Label>
-                      <RadioGroup
-                        value={orderData.paymentMode}
-                        onValueChange={(value) =>
-                          setOrderData({ ...orderData, paymentMode: value })
-                        }
-                        className="flex gap-6 mt-2"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="prepaid" id="b2b-prepaid" />
-                            <Label
-                              htmlFor="b2b-prepaid"
-                              className="cursor-pointer text-slate-800 text-xs"
-                            >
-                            Prepaid
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="cod" id="b2b-cod" />
-                            <Label
-                              htmlFor="b2b-cod"
-                              className="cursor-pointer text-slate-800 text-xs"
-                            >
-                            COD
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                    {orderData.paymentMode === "cod" && (
-                      <div>
-                        <Label className="text-slate-900 font-semibold text-xs">
-                          COD Amount (₹) *
-                        </Label>
-                        <Input
-                          required
-                          type="number"
-                          value={orderData.codAmount}
-                  onChange={(e) =>
-                            setOrderData({
-                              ...orderData,
-                              codAmount: e.target.value,
-                            })
-                          }
-                          placeholder="Enter COD amount"
-                          className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <Label className="text-slate-900 font-semibold text-xs">
-                        Pickup Slot Date *
-                      </Label>
-                      <Input
-                        required
-                        type="date"
-                        value={orderData.slotDate}
-                        onChange={(e) =>
-                          setOrderData({
-                            ...orderData,
-                            slotDate: e.target.value,
-                          })
-                        }
-                        min={new Date().toISOString().split("T")[0]}
-                        className="border border-slate-300 focus:border-slate-700 focus:ring-1 focus:ring-slate-500 bg-white text-sm rounded-sm"
-                      />
-                    </div>
-              </CardContent>
-            </Card>
-          </div>
-
-              {/* B2B Sidebar */}
-          <div className="lg:col-span-1">
-                <Card className="sticky top-4 bg-white border border-slate-300 rounded-md shadow-sm">
-                  <CardHeader className="bg-slate-900 rounded-t-md border-b border-slate-800">
-                    <CardTitle className="text-slate-50 font-semibold text-base">
-                      Order Summary
-                    </CardTitle>
-              </CardHeader>
-                  <CardContent className="space-y-4 pt-6 bg-slate-50">
-                    <div className="p-3 bg-slate-900 rounded border border-slate-700">
-                      <Badge className="bg-slate-800 text-slate-50 text-[11px] font-semibold px-2.5 py-0.5">
-                        B2B Consignment
-                      </Badge>
-                      {orderData.invoiceNumber && (
-                        <div className="text-[11px] text-slate-400 mt-2">
-                        Invoice: {orderData.invoiceNumber}
-                      </div>
-                    )}
-                        </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-600">Shipping Charges</span>
-                      <span className="font-semibold text-slate-800">
-                        ₹{orderData.weight ? (parseFloat(orderData.weight) * 50).toFixed(2) : "0.00"}
-                    </span>
-                  </div>
-                  {orderData.paymentMode === "cod" && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-600">COD Charges</span>
-                        <span className="font-semibold text-slate-700">
-                          ₹{orderData.codAmount ? (parseFloat(orderData.codAmount) * 0.02).toFixed(2) : "0.00"}
-                      </span>
-                    </div>
-                  )}
-                    <div className="border-t border-slate-300 pt-3">
-                      <div className="flex justify-between font-semibold text-sm">
-                        <span className="text-slate-900">Total</span>
-                        <span className="text-slate-900">
-                          ₹{orderData.weight
-                          ? (
-                              parseFloat(orderData.weight) * 50 +
-                                (orderData.paymentMode === "cod" && orderData.codAmount
-                                ? parseFloat(orderData.codAmount) * 0.02
-                                : 0)
-                            ).toFixed(2)
-                          : "0.00"}
-                      </span>
-                  </div>
-                </div>
-                {!orderConfirmed ? (
-                      <div className="space-y-2 pt-4 border-t border-slate-300">
-                    <Button
-                      type="submit"
-                          className="w-full bg-slate-900 hover:bg-slate-950 text-white shadow-sm hover:shadow-md transition-all font-semibold text-sm py-3 rounded-sm"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                          Create B2B Consignment
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                          className="w-full border-slate-300 hover:bg-slate-100 text-slate-800 text-xs rounded-sm"
-                      onClick={handleSaveDraft}
-                    >
-                      Save as Draft
-                    </Button>
-                  </div>
-                ) : (
-                      <div className="space-y-3 pt-4 border-t border-slate-300">
-                        <div className="p-3 bg-slate-900 rounded border border-slate-700">
-                          <p className="text-xs font-semibold text-slate-50">
-                            Consignment Created Successfully!
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                            className="border-slate-300 hover:bg-slate-100 text-slate-800 text-xs rounded-sm"
-                        onClick={() => handleGenerateDocument("manifest")}
-                        disabled={generatedDocuments.manifest}
-                      >
-                        <FileText className="w-3 h-3 mr-1" />
-                        Manifest
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                            className="border-slate-300 hover:bg-slate-100 text-slate-800 text-xs rounded-sm"
-                        onClick={() => handleGenerateDocument("gst")}
-                        disabled={generatedDocuments.gst}
-                      >
-                        <Receipt className="w-3 h-3 mr-1" />
-                        GST
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                            className="border-slate-300 hover:bg-slate-100 text-slate-800 text-xs rounded-sm"
-                        onClick={() => handleGenerateDocument("awb")}
-                        disabled={generatedDocuments.awb}
-                      >
-                        <FileCheck className="w-3 h-3 mr-1" />
-                        AWB
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                            className="border-slate-300 hover:bg-slate-100 text-slate-800 text-xs rounded-sm"
-                        onClick={() => handleGenerateDocument("label")}
-                        disabled={generatedDocuments.label}
-                      >
-                        <FileText className="w-3 h-3 mr-1" />
-                        Label
-                      </Button>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                          className="w-full border-slate-300 hover:bg-slate-100 text-slate-800 text-xs rounded-sm"
-                      onClick={handleExportCSV}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                          Export CSV
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                          className="w-full border-slate-300 hover:bg-slate-100 text-slate-800 text-xs rounded-sm"
-                      onClick={handleGenerateInvoice}
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      Generate Invoice
-                    </Button>
-                    <Button
-                      type="button"
-                          className="w-full bg-slate-900 hover:bg-black text-white text-sm rounded-sm"
-                      onClick={handleConfirmOrder}
-                    >
-                      Confirm & Finish
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+              <B2BStructuredForm
+                formData={b2bData}
+                setFormData={setB2BData}
+                onSubmit={handleSubmit}
+                onSaveDraft={handleSaveDraft}
+                orderConfirmed={orderConfirmed}
+                onConfirm={handleConfirmOrder}
+                onFileUpload={handleFileUpload}
+                onRemoveFile={handleRemoveFile}
+                invoiceFileName={invoiceFileName}
+                ewayBillFileName={ewayBillFileName}
+                onGenerateDocument={handleGenerateDocument}
+                generatedDocuments={generatedDocuments}
+                onExportCSV={handleExportCSV}
+                onGenerateInvoice={handleGenerateInvoice}
+              />
             </motion.div>
           )}
         </AnimatePresence>
-      </form>
+      </div>
     </div>
   );
 };
