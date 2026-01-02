@@ -107,6 +107,14 @@ const Analytics = () => {
     { courier: "DTDC", orders: 400, discrepancies: 12, rate: 3.0 },
   ];
 
+  // Appointment Delivery Analytics
+  const appointmentDeliveryData = [
+    { month: "Jan", appointments: 280, completed: 265, pending: 15 },
+    { month: "Feb", appointments: 320, completed: 305, pending: 15 },
+    { month: "Mar", appointments: 350, completed: 335, pending: 15 },
+    { month: "Apr", appointments: 290, completed: 275, pending: 15 },
+  ];
+
   const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
   return (
@@ -148,6 +156,32 @@ const Analytics = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border-gray-200/80 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
           <CardHeader className="pb-2">
+            <CardDescription>Total Shipments</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">6,100</div>
+            <div className="flex items-center text-xs mt-1">
+              <ArrowUpRight className="w-3 h-3 text-green-600 mr-1" />
+              <span className="text-green-600">+12.5%</span>
+              <span className="text-gray-500 ml-1">vs last period</span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Appointment Deliveries</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">1,240</div>
+            <div className="flex items-center text-xs mt-1">
+              <ArrowUpRight className="w-3 h-3 text-green-600 mr-1" />
+              <span className="text-green-600">+8.2%</span>
+              <span className="text-gray-500 ml-1">vs last period</span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
             <CardDescription>On-Time Delivery (OTD)</CardDescription>
           </CardHeader>
           <CardContent>
@@ -161,19 +195,6 @@ const Analytics = () => {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Average Delivery Time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">2.4 days</div>
-            <div className="flex items-center text-xs mt-1">
-              <ArrowDownRight className="w-3 h-3 text-green-600 mr-1" />
-              <span className="text-green-600">-0.3 days</span>
-              <span className="text-gray-500 ml-1">improvement</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
             <CardDescription>RTO Rate</CardDescription>
           </CardHeader>
           <CardContent>
@@ -181,19 +202,6 @@ const Analytics = () => {
             <div className="flex items-center text-xs mt-1">
               <ArrowDownRight className="w-3 h-3 text-green-600 mr-1" />
               <span className="text-green-600">-0.5%</span>
-              <span className="text-gray-500 ml-1">reduction</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>NDR Rate</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">4.5%</div>
-            <div className="flex items-center text-xs mt-1">
-              <ArrowDownRight className="w-3 h-3 text-green-600 mr-1" />
-              <span className="text-green-600">-0.8%</span>
               <span className="text-gray-500 ml-1">reduction</span>
             </div>
           </CardContent>
@@ -291,6 +299,60 @@ const Analytics = () => {
                   <Bar dataKey="cost" fill="#f59e0b" name="Cost" />
                   <Bar dataKey="profit" fill="#10b981" name="Profit" />
                 </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Appointment Delivery Analytics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Appointment Delivery Analytics</CardTitle>
+              <CardDescription>
+                Appointment delivery trends and completion rates
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <AreaChart data={appointmentDeliveryData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="month" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "white",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="appointments"
+                    stackId="1"
+                    stroke="#8b5cf6"
+                    fill="#8b5cf6"
+                    fillOpacity={0.6}
+                    name="Total Appointments"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="completed"
+                    stackId="1"
+                    stroke="#10b981"
+                    fill="#10b981"
+                    fillOpacity={0.6}
+                    name="Completed"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="pending"
+                    stackId="1"
+                    stroke="#f59e0b"
+                    fill="#f59e0b"
+                    fillOpacity={0.6}
+                    name="Pending"
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>

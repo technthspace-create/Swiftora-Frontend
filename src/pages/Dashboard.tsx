@@ -131,9 +131,6 @@ const Dashboard = () => {
   const [pickupOperationsExpanded, setPickupOperationsExpanded] = useState(() =>
     loadPreference("pickup_operations_expanded", true)
   );
-  const [performanceExpanded, setPerformanceExpanded] = useState(() =>
-    loadPreference("performance_expanded", false)
-  );
   const [discoveryExpanded, setDiscoveryExpanded] = useState(() =>
     loadPreference("discovery_expanded", false)
   );
@@ -147,9 +144,6 @@ const Dashboard = () => {
     savePreference("pickup_operations_expanded", pickupOperationsExpanded);
   }, [pickupOperationsExpanded]);
 
-  useEffect(() => {
-    savePreference("performance_expanded", performanceExpanded);
-  }, [performanceExpanded]);
 
   useEffect(() => {
     savePreference("discovery_expanded", discoveryExpanded);
@@ -1026,19 +1020,6 @@ const Dashboard = () => {
               </CardContent>
             </Card>
             
-            <Card 
-              className="flex-1 min-w-[140px] bg-white border border-red-200 hover:border-red-300 shadow-sm hover:shadow transition-all cursor-pointer group"
-              onClick={() => navigate("/dashboard/analytics?filter=sla-breaches")}
-            >
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-medium text-gray-600">SLA Breaches</span>
-                  <XCircle className="w-3.5 h-3.5 text-red-600" />
-                </div>
-                <div className="text-xl font-bold text-gray-900 mb-0.5">3</div>
-                <p className="text-xs text-red-600">Investigate</p>
-              </CardContent>
-            </Card>
           </div>
 
           {/* B2B analytics: no playful gradients, more structured */}
@@ -1527,229 +1508,6 @@ const Dashboard = () => {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      </div>
-
-      {/* ============================================
-          ZONE 3: PERFORMANCE INSIGHTS (Collapsible)
-          ============================================ */}
-      <div className="mb-12">
-        <Collapsible open={performanceExpanded} onOpenChange={setPerformanceExpanded}>
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-gray-50/50 transition-colors border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <BarChart3 className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-bold text-gray-900">
-                        Performance Insights
-                      </CardTitle>
-                      <CardDescription className="text-sm text-gray-600 mt-0.5">
-                        Analytics, trends, and success metrics
-                      </CardDescription>
-                    </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {performanceExpanded ? "Expanded" : "Collapsed"}
-                    </Badge>
-                    {performanceExpanded ? (
-                      <ChevronUp className="w-5 h-5 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
-                    )}
-                    </div>
-                  </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-6 space-y-6">
-                {/* Analytics Overview */}
-                {!isB2B && (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <Card className="lg:col-span-1 bg-white border border-gray-200 shadow-sm">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-bold text-gray-900">
-                          98.2% Success Rate
-                        </CardTitle>
-                        <CardDescription className="text-sm text-gray-600">
-                          Your delivery success rate is outstanding
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="flex flex-col items-center justify-center p-6">
-                        <div className="relative w-48 h-48 mb-4">
-                          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#067adf] to-purple-500 animate-pulse"></div>
-                          <div className="absolute inset-2 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                            <span className="text-4xl font-bold text-gray-900">
-                              98.2%
-                            </span>
-                </div>
-            </div>
-                        <Button
-                          variant="outline"
-                          className="w-full border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 transition-all"
-                          onClick={() => navigate("/dashboard/analytics")}
-                        >
-                          Optimize Performance
-                          <ArrowUpRight className="w-4 h-4 ml-2" />
-                        </Button>
-          </CardContent>
-        </Card>
-
-                    <Card className="lg:col-span-2 bg-gradient-to-br from-[#067adf] to-purple-200 border border-white/10 shadow-lg">
-                      <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                            <CardTitle className="text-xl font-bold text-white">
-                              Monthly Shipment Volume
-                </CardTitle>
-                            <CardDescription className="mt-1 text-gray-200">
-                              Number of shipments over the past year
-                </CardDescription>
-              </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                            className="bg-white/20 border-white/30 text-white hover:bg-white/30 hover:border-white/50 transition-all"
-                            onClick={() => navigate("/dashboard/analytics")}
-                >
-                            Analyze Trends
-                            <ArrowUpRight className="w-4 h-4 ml-2" />
-                </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={monthlyShipmentData}>
-                            <RechartsTooltip
-                              contentStyle={{
-                                backgroundColor: "rgba(0, 0, 0, 0.8)",
-                                borderColor: "#067adf",
-                                color: "white",
-                              }}
-                              itemStyle={{ color: "white" }}
-                              labelStyle={{ color: "white", fontWeight: "bold" }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="shipments"
-                              stroke="white"
-                              strokeWidth={3}
-                              dot={{ r: 5, fill: "white" }}
-                              activeDot={{ r: 8 }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-
-                {/* B2B Analytics */}
-                {isB2B && (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <Card className="lg:col-span-1 bg-white border border-slate-200 shadow-sm">
-                      <CardHeader className="border-b border-slate-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-sm font-semibold text-slate-900">
-                              Invoice Status Overview
-                            </CardTitle>
-                            <CardDescription className="text-xs text-slate-600">
-                              Breakdown of GST invoice lifecycle
-                            </CardDescription>
-                          </div>
-                <Button
-                            variant="ghost"
-                  size="sm"
-                            className="text-xs text-slate-600 hover:text-slate-900"
-                            onClick={() => navigate("/dashboard/billing")}
-                >
-                            View All
-                            <ArrowUpRight className="w-3 h-3 ml-1" />
-                </Button>
-            </div>
-          </CardHeader>
-                      <CardContent className="pt-6 space-y-3 text-sm text-slate-700">
-                        <div className="flex items-center justify-between">
-                          <span>Generated</span>
-                          <span className="font-semibold">128</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Submitted</span>
-                          <span className="font-semibold">114</span>
-            </div>
-                        <div className="flex items-center justify-between">
-                          <span>Pending filing</span>
-                          <span className="font-semibold text-amber-600">14</span>
-                        </div>
-              <Button
-                variant="outline"
-                          size="sm"
-                          className="w-full mt-4 border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400"
-                          onClick={() => navigate("/dashboard/billing?filter=pending")}
-              >
-                          File Pending Invoices
-                          <ArrowUpRight className="w-3 h-3 ml-1" />
-              </Button>
-                      </CardContent>
-                    </Card>
-                    <Card className="lg:col-span-2 bg-white border border-slate-200 shadow-sm">
-                      <CardHeader className="border-b border-slate-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-sm font-semibold text-slate-900">
-                              Monthly B2B Shipment Volume
-                            </CardTitle>
-                            <CardDescription className="text-xs text-slate-600">
-                              Consignments processed over the past year
-                            </CardDescription>
-            </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-slate-600 hover:text-slate-900"
-                            onClick={() => navigate("/dashboard/analytics")}
-                          >
-                            Analyze Trends
-                            <ArrowUpRight className="w-3 h-3 ml-1" />
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={monthlyShipmentData}>
-                            <CartesianGrid stroke="#E5E7EB" vertical={false} />
-                            <XAxis dataKey="month" stroke="#6B7280" fontSize={11} />
-                            <YAxis stroke="#6B7280" fontSize={11} />
-                            <RechartsTooltip
-                              contentStyle={{
-                                backgroundColor: "#020617",
-                                borderColor: "#1E293B",
-                                color: "white",
-                              }}
-                              labelStyle={{ color: "white", fontWeight: "bold" }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="shipments"
-                              stroke="#0F172A"
-                              strokeWidth={2.5}
-                              dot={{ r: 3, fill: "#0F172A" }}
-                              activeDot={{ r: 5 }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-          </CardContent>
-        </Card>
-            </div>
-                )}
               </CardContent>
             </CollapsibleContent>
           </Card>

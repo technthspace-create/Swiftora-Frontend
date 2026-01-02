@@ -15,9 +15,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Package,
   User,
@@ -93,10 +109,15 @@ interface B2BFormData {
   pickupPincode: string;
   pickupPhone: string;
   pickupEmail: string;
+  pickupContactPerson: string;
+  pickupContactPhone: string;
   shippingAddress: string;
   shippingCity: string;
   shippingState: string;
   shippingPincode: string;
+  shippingContactPerson: string;
+  shippingContactPhone: string;
+  deliveryType: "normal" | "appointment" | "";
   orderId: string;
   productName: string;
   quantity: string;
@@ -231,6 +252,7 @@ const B2CFastForm = ({
     if (!formData.customerPhone) missing.push("Phone Number");
     if (!formData.shippingAddress) missing.push("Delivery Address");
     if (!formData.shippingCity) missing.push("City");
+    if (!formData.shippingState) missing.push("State");
     if (!formData.shippingPincode) missing.push("Pincode");
     if (!formData.productName) missing.push("Product Name");
     if (formData.boxes.length === 0 || formData.boxes.some(b => !b.weight)) missing.push("Box Weight");
@@ -327,7 +349,7 @@ const B2CFastForm = ({
                         className="mt-1 text-sm border-blue-200 focus:border-blue-500"
                   />
                 </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                   <div>
                         <Label className="text-xs font-medium text-slate-700">City *</Label>
                     <Input
@@ -335,6 +357,16 @@ const B2CFastForm = ({
                           value={formData.shippingCity}
                           onChange={(e) => setFormData({ ...formData, shippingCity: e.target.value })}
                       placeholder="City"
+                          className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">State *</Label>
+                    <Input
+                      required
+                          value={formData.shippingState}
+                          onChange={(e) => setFormData({ ...formData, shippingState: e.target.value })}
+                      placeholder="State"
                           className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
                     />
                   </div>
@@ -440,14 +472,10 @@ const B2CFastForm = ({
                         />
                       </div>
                               
-                              {/* Advanced: Dimensions - Collapsed by default */}
-                              <Collapsible>
-                                <CollapsibleTrigger className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                                  <ChevronDown className="w-3 h-3" />
-                                  Add dimensions (for accurate weight calculation)
-                                </CollapsibleTrigger>
-                                <CollapsibleContent>
-                                  <div className="mt-2 grid grid-cols-3 gap-2">
+                              {/* Dimensions - Shown directly */}
+                              <div className="mt-2">
+                                <Label className="text-xs font-medium text-gray-600 mb-2 block">Dimensions (cm)</Label>
+                                <div className="grid grid-cols-3 gap-2">
                         <Input
                           type="number"
                                       step="0.1"
@@ -473,8 +501,7 @@ const B2CFastForm = ({
                                       className="h-9 text-sm border-blue-200 focus:border-blue-500"
                     />
                   </div>
-                                </CollapsibleContent>
-                              </Collapsible>
+                              </div>
                 </div>
                           ))}
                           
@@ -501,6 +528,17 @@ const B2CFastForm = ({
                     </div>
                   </Collapsible>
 
+                    <div>
+                      <Label className="text-xs font-medium text-slate-700">Declared Value (₹) *</Label>
+                      <Input
+                        required
+                        type="number"
+                        value={formData.declaredValue}
+                        onChange={(e) => setFormData({ ...formData, declaredValue: e.target.value })}
+                        placeholder="1000"
+                        className="mt-1 h-9 text-sm border-blue-200 focus:border-blue-500"
+                      />
+                    </div>
                     <div>
                       <Label className="text-xs font-medium text-slate-700">Payment *</Label>
                       <RadioGroup
@@ -807,12 +845,106 @@ const B2BStructuredForm = ({
   const missingFields = getMissingFields();
   const isFormValid = missingFields.length === 0;
 
+  // State for new address dialog
+  const [isNewAddressDialogOpen, setIsNewAddressDialogOpen] = useState(false);
+  const [newAddress, setNewAddress] = useState({
+    name: "",
+    address: "",
+    city: "",
+    state: "",
+    pincode: "",
+    phone: "",
+    email: "",
+    contactPerson: "",
+  });
+
+  // Fetch pickup addresses from pickup management (mock data - in real app, fetch from API)
+  const [pickupAddresses, setPickupAddresses] = useState([
+    {
+      id: 1,
+      name: "Main Warehouse",
+      address: "123 Logistics Avenue, Suite 500",
+      pincode: "400001",
+      city: "Mumbai",
+      state: "Maharashtra",
+      phone: "+91 98765 43210",
+      email: "warehouse@company.com",
+      isDefault: true,
+      status: "Active",
+    },
+    {
+      id: 2,
+      name: "Secondary Warehouse",
+      address: "456 Industrial Road",
+      pincode: "110001",
+      city: "Delhi",
+      state: "Delhi",
+      phone: "+91 98765 43211",
+      email: "warehouse2@company.com",
+      isDefault: false,
+      status: "Active",
+    },
+  ]);
+
+  // Handle adding new pickup address
+  const handleAddNewAddress = () => {
+    if (!newAddress.name || !newAddress.address || !newAddress.city || !newAddress.pincode || !newAddress.phone || !newAddress.contactPerson) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    const newAddressObj = {
+      id: pickupAddresses.length + 1,
+      name: newAddress.name,
+      address: newAddress.address,
+      pincode: newAddress.pincode,
+      city: newAddress.city,
+      state: newAddress.state || "",
+      phone: newAddress.phone,
+      email: newAddress.email || "",
+      isDefault: false,
+      status: "Active",
+    };
+
+    setPickupAddresses([...pickupAddresses, newAddressObj]);
+    
+    // Auto-fill the form with the new address
+    setFormData({
+      ...formData,
+      pickupAddress: newAddressObj.address,
+      pickupCity: newAddressObj.city,
+      pickupState: newAddressObj.state,
+      pickupPincode: newAddressObj.pincode,
+      pickupPhone: newAddressObj.phone,
+      pickupEmail: newAddressObj.email,
+      pickupContactPerson: newAddress.contactPerson,
+      pickupContactPhone: newAddress.phone,
+    });
+
+    // Reset form and close dialog
+    setNewAddress({
+      name: "",
+      address: "",
+      city: "",
+      state: "",
+      pincode: "",
+      phone: "",
+      email: "",
+      contactPerson: "",
+    });
+    setIsNewAddressDialogOpen(false);
+    toast.success("New pickup address added successfully!");
+  };
+
   const timeSlots = [
     "09:00 AM - 12:00 PM",
     "12:00 PM - 03:00 PM",
     "03:00 PM - 06:00 PM",
     "06:00 PM - 09:00 PM",
   ];
+
+  // Check if E-way bill is required (order value > 50k)
+  const isEwayBillRequired = parseFloat(formData.declaredValue || "0") > 50000;
 
   // Step management for guided flow
   const [activeStep, setActiveStep] = useState<string>("step-1");
@@ -951,6 +1083,36 @@ const B2BStructuredForm = ({
                 <AccordionContent>
                   <div className="px-4 pb-4 pt-2">
                     <div className="space-y-4">
+                    <div className="flex justify-end mb-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Autofill from saved company details (mock data - in real app, fetch from settings/API)
+                          const savedCompany = {
+                            companyName: "Acme Logistics Pvt. Ltd.",
+                            gstNumber: "27AAAAA0000A1Z5",
+                            customerName: "John Doe",
+                            customerPhone: "+91 98765 43210",
+                            customerEmail: "john@acme.com"
+                          };
+                          setFormData({
+                            ...formData,
+                            companyName: savedCompany.companyName,
+                            gstNumber: savedCompany.gstNumber,
+                            customerName: savedCompany.customerName,
+                            customerPhone: savedCompany.customerPhone,
+                            customerEmail: savedCompany.customerEmail
+                          });
+                          toast.success("Company details autofilled");
+                        }}
+                        className="text-xs"
+                      >
+                        <Check className="w-3 h-3 mr-1" />
+                        Autofill Company Details
+                      </Button>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label className="text-slate-900 font-semibold text-sm">Company Name *</Label>
@@ -1042,6 +1204,175 @@ const B2BStructuredForm = ({
                       </h4>
                   <div className="space-y-3 pl-3 border-l border-slate-200">
                         <div>
+                      <Label className="text-xs font-medium text-slate-700">Select Pickup Address *</Label>
+                          <div className="flex gap-2 mt-1">
+                            <Select
+                              required
+                              value={formData.pickupAddress}
+                              onValueChange={(value) => {
+                                // Fetch address details from pickup management
+                                const selectedAddress = pickupAddresses.find(addr => addr.address === value);
+                                if (selectedAddress) {
+                                  setFormData({
+                                    ...formData,
+                                    pickupAddress: selectedAddress.address,
+                                    pickupCity: selectedAddress.city,
+                                    pickupState: selectedAddress.state,
+                                    pickupPincode: selectedAddress.pincode,
+                                    pickupPhone: selectedAddress.phone,
+                                    pickupEmail: selectedAddress.email,
+                                    pickupContactPerson: selectedAddress.name,
+                                    pickupContactPhone: selectedAddress.phone
+                                  });
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="flex-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white">
+                                <SelectValue placeholder="Select pickup address" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {pickupAddresses.map((addr) => (
+                                  <SelectItem key={addr.id} value={addr.address}>
+                                    {addr.name} - {addr.address}, {addr.city}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Dialog open={isNewAddressDialogOpen} onOpenChange={setIsNewAddressDialogOpen}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="h-9 px-3 border-slate-300 hover:bg-slate-50"
+                                  onClick={() => setIsNewAddressDialogOpen(true)}
+                                >
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Add New
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                  <DialogTitle>Add New Pickup Address</DialogTitle>
+                                  <DialogDescription>
+                                    Add a new pickup address to your address book
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <div>
+                                    <Label className="text-sm font-medium">Address Name *</Label>
+                                    <Input
+                                      value={newAddress.name}
+                                      onChange={(e) => setNewAddress({ ...newAddress, name: e.target.value })}
+                                      placeholder="e.g., Main Warehouse"
+                                      className="mt-1"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-medium">Address *</Label>
+                                    <Textarea
+                                      value={newAddress.address}
+                                      onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
+                                      placeholder="Street address"
+                                      rows={2}
+                                      className="mt-1"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <Label className="text-sm font-medium">City *</Label>
+                                      <Input
+                                        value={newAddress.city}
+                                        onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
+                                        placeholder="City"
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm font-medium">State</Label>
+                                      <Input
+                                        value={newAddress.state}
+                                        onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
+                                        placeholder="State"
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-medium">Pincode *</Label>
+                                    <Input
+                                      value={newAddress.pincode}
+                                      onChange={(e) => setNewAddress({ ...newAddress, pincode: e.target.value })}
+                                      placeholder="400001"
+                                      maxLength={6}
+                                      className="mt-1"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-sm font-medium">Contact Person Name *</Label>
+                                    <Input
+                                      value={newAddress.contactPerson}
+                                      onChange={(e) => setNewAddress({ ...newAddress, contactPerson: e.target.value })}
+                                      placeholder="Contact person name"
+                                      className="mt-1"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <Label className="text-sm font-medium">Phone Number *</Label>
+                                      <Input
+                                        type="tel"
+                                        value={newAddress.phone}
+                                        onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+                                        placeholder="+91 98765 43210"
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm font-medium">Email</Label>
+                                      <Input
+                                        type="email"
+                                        value={newAddress.email}
+                                        onChange={(e) => setNewAddress({ ...newAddress, email: e.target.value })}
+                                        placeholder="email@example.com"
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setIsNewAddressDialogOpen(false);
+                                      setNewAddress({
+                                        name: "",
+                                        address: "",
+                                        city: "",
+                                        state: "",
+                                        pincode: "",
+                                        phone: "",
+                                        email: "",
+                                        contactPerson: "",
+                                      });
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    onClick={handleAddNewAddress}
+                                    className="bg-slate-900 hover:bg-slate-800"
+                                  >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Address
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </div>
+                        <div>
                       <Label className="text-xs font-medium text-slate-700">Address *</Label>
                           <Textarea
                             required
@@ -1071,6 +1402,29 @@ const B2BStructuredForm = ({
                           onChange={(e) => setFormData({ ...formData, pickupPincode: e.target.value })}
                               placeholder="400001"
                               maxLength={6}
+                          className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                </div>
+                        <div className="grid grid-cols-2 gap-3">
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">Contact Person Name *</Label>
+                    <Input
+                      required
+                          value={formData.pickupContactPerson}
+                          onChange={(e) => setFormData({ ...formData, pickupContactPerson: e.target.value })}
+                              placeholder="Contact person name"
+                          className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">Contact Number *</Label>
+                    <Input
+                      required
+                      type="tel"
+                          value={formData.pickupContactPhone}
+                          onChange={(e) => setFormData({ ...formData, pickupContactPhone: e.target.value })}
+                              placeholder="+91 98765 43210"
                           className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
                     />
                   </div>
@@ -1118,22 +1472,75 @@ const B2BStructuredForm = ({
                     />
                   </div>
                 </div>
+                        <div className="grid grid-cols-2 gap-3">
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">Contact Person Name *</Label>
+                    <Input
+                      required
+                          value={formData.shippingContactPerson}
+                          onChange={(e) => setFormData({ ...formData, shippingContactPerson: e.target.value })}
+                              placeholder="Contact person name"
+                          className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                  <div>
+                        <Label className="text-xs font-medium text-slate-700">Contact Number *</Label>
+                    <Input
+                      required
+                      type="tel"
+                          value={formData.shippingContactPhone}
+                          onChange={(e) => setFormData({ ...formData, shippingContactPhone: e.target.value })}
+                              placeholder="+91 98765 43210"
+                          className="mt-1 h-9 text-sm border-slate-300 focus:border-slate-700 bg-white"
+                    />
+                  </div>
+                </div>
                       </div>
                 </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100">
+                    <Label className="text-slate-900 font-semibold text-sm mb-2 block">Delivery Type *</Label>
+                    <RadioGroup
+                      value={formData.deliveryType}
+                      onValueChange={(value) => setFormData({ ...formData, deliveryType: value as "normal" | "appointment" | "" })}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="normal" id="normal-delivery" />
+                        <Label htmlFor="normal-delivery" className="cursor-pointer text-sm">Normal Delivery</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="appointment" id="appointment-delivery" />
+                        <Label htmlFor="appointment-delivery" className="cursor-pointer text-sm">Appointment Delivery</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
                   <div className="pt-3 border-t border-slate-100 flex justify-between">
                     <Button type="button" variant="outline" onClick={goToPreviousStep} className="border-slate-300 hover:bg-slate-50">
                       <ChevronLeft className="w-4 h-4 mr-2" /> Previous
                     </Button>
-                    <Button type="button" onClick={goToNextStep} variant="outline" className="border-slate-300 hover:bg-slate-50">
-                      Next: Appointment <ArrowRight className="w-4 h-4 ml-2" />
+                    <Button 
+                      type="button" 
+                      onClick={() => {
+                        if (formData.deliveryType === "appointment") {
+                          goToNextStep();
+                        } else {
+                          // Skip appointment step, go directly to compliance
+                          setActiveStep("step-4");
+                        }
+                      }} 
+                      variant="outline" 
+                      className="border-slate-300 hover:bg-slate-50"
+                    >
+                      Next: {formData.deliveryType === "appointment" ? "Appointment" : "Compliance"} <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
 
-            {/* Step 3: Appointment Booking */}
+            {/* Step 3: Appointment Booking (Only for appointment delivery) */}
+            {formData.deliveryType === "appointment" && (
             <AccordionItem value="step-3" className="border-b border-slate-200 bg-white">
               <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50/50">
                 <div className="flex items-center gap-3 w-full">
@@ -1271,6 +1678,7 @@ const B2BStructuredForm = ({
                 </div>
               </AccordionContent>
             </AccordionItem>
+            )}
 
             {/* Step 4: Invoice & E-way Bill Upload */}
             <AccordionItem value="step-4" className="border-b border-slate-200 bg-white">
@@ -1353,6 +1761,50 @@ const B2BStructuredForm = ({
                     </div>
                         )}
                   </div>
+                      {isEwayBillRequired && (
+                        <div>
+                          <Label className="text-slate-900 font-semibold text-sm">E-way Bill Upload *</Label>
+                          {!formData.ewayBillFile ? (
+                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-400 rounded cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all mt-1">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <Upload className="w-8 h-8 mb-2 text-slate-600" />
+                                <p className="mb-2 text-sm text-slate-600">
+                                  <span className="font-semibold">Click to upload</span> E-way Bill
+                                </p>
+                                <p className="text-xs text-slate-500">PNG, JPG, PDF (MAX. 5MB)</p>
+                                <p className="text-xs text-amber-600 mt-1">Required for orders above ₹50,000</p>
+                              </div>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/jpeg,image/png,image/jpg,application/pdf"
+                                onChange={(e) => onFileUpload(e, "ewayBill")}
+                              />
+                            </label>
+                          ) : (
+                            <div className="mt-1 p-4 border border-slate-300 rounded bg-slate-50 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <FileText className="w-5 h-5 text-slate-600" />
+                                <div>
+                                  <p className="text-sm font-medium text-slate-900">{ewayBillFileName}</p>
+                                  <p className="text-xs text-slate-600">
+                                    {(formData.ewayBillFile!.size / 1024).toFixed(2)} KB
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="hover:bg-slate-200"
+                                onClick={() => onRemoveFile("ewayBill")}
+                              >
+                                <X className="w-4 h-4 text-slate-600" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                           </div>
                       </div>
                   <div className="pt-3 border-t border-slate-100 flex justify-between">
@@ -1974,10 +2426,15 @@ const CreateOrder = () => {
     pickupPincode: "",
     pickupPhone: "",
     pickupEmail: "",
+    pickupContactPerson: "",
+    pickupContactPhone: "",
     shippingAddress: "",
     shippingCity: "",
     shippingState: "",
     shippingPincode: "",
+    shippingContactPerson: "",
+    shippingContactPhone: "",
+    deliveryType: "",
     orderId: "",
     productName: "",
     quantity: "1",
